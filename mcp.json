@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {}
+    },
+    "kovcheg": {
+      "url": "https://mcp-kv.ru/mcp/sse/REPLACE_WITH_KOVCHEG_USER_ID",
+      "headers": {
+        "Authorization": "REPLACE_WITH_KOVCHEG_AUTH"
+      }
+    },
+    "react-bits": {
+      "command": "C:\\mcp\\node_modules\\.bin\\reactbits-dev-mcp.cmd",
+      "args": []
+    },
+    "make": {
+      "url": "https://eu2.make.com/mcp/stateless",
+      "headers": {
+        "Authorization": "Bearer REPLACE_WITH_MAKE_TOKEN"
+      }
+    },
+    "semgrep": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "uvx",
+        "--python",
+        "3.12",
+        "semgrep-mcp"
+      ]
+    },
+    "shadcn-ui": {
+      "command": "npx",
+      "args": [
+        "@jpisnice/shadcn-ui-mcp-server",
+        "--github-api-key",
+        "REPLACE_WITH_GITHUB_API_KEY"
+      ]
+    }
+  }
+}

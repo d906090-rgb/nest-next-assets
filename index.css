@@ -1,0 +1,510 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Manrope:wght@500;600;700;800&display=swap');
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-heading: "Manrope", sans-serif;
+  --animate-shine: shine 1.5s infinite linear;
+  --animate-electric-top: electric-top 2s linear infinite;
+  --animate-electric-right: electric-right 2s linear infinite;
+  --animate-electric-bottom: electric-bottom 2s linear infinite;
+  --animate-electric-left: electric-left 2s linear infinite;
+
+  @keyframes shine {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes electric-top {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  @keyframes electric-right {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+  @keyframes electric-bottom {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  @keyframes electric-left {
+    0% { transform: translateY(100%); }
+    100% { transform: translateY(-100%); }
+  }
+}
+
+/* Electric Border - React Bits Implementation Styles */
+.electric-border {
+  --electric-light-color: oklch(from var(--electric-border-color) l c h);
+  --eb-border-width: 2px;
+  position: relative;
+  border-radius: inherit;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.eb-svg {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  width: 10px;
+  height: 10px;
+  opacity: 0.001;
+  pointer-events: none;
+}
+
+.eb-content {
+  position: relative;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.eb-layers {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.eb-stroke,
+.eb-glow-1,
+.eb-glow-2,
+.eb-overlay-1,
+.eb-overlay-2,
+.eb-background-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.eb-stroke {
+  border: var(--eb-border-width) solid var(--electric-border-color);
+}
+
+.eb-glow-1 {
+  border: var(--eb-border-width) solid oklch(from var(--electric-border-color) l c h / 0.6);
+  opacity: 0.5;
+  filter: blur(calc(0.5px + (var(--eb-border-width) * 0.25)));
+}
+
+.eb-glow-2 {
+  border: var(--eb-border-width) solid var(--electric-light-color);
+  opacity: 0.5;
+  filter: blur(calc(2px + (var(--eb-border-width) * 0.5)));
+}
+
+.eb-background-glow {
+  z-index: -1;
+  transform: scale(1.08);
+  filter: blur(32px);
+  opacity: 0.3;
+  background: linear-gradient(-30deg, var(--electric-light-color), transparent, var(--electric-border-color));
+}
+
+/* ==================== CYBERPUNK THEME STYLES ==================== */
+
+/* ACCORDIONS */
+.cyber-accordion {
+  background: rgba(13, 25, 41, 0.7);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  overflow: hidden;
+}
+
+.cyber-accordion[open] {
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.1);
+}
+
+.cyber-accordion summary {
+  outline: none;
+}
+
+.cyber-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion-header h3 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.accordion-header .arrow {
+  transition: transform 0.3s ease;
+}
+
+details[open] .accordion-header .arrow {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  animation: accordion-fade-in 0.3s ease-out;
+}
+
+@keyframes accordion-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* SOCIALS GRID */
+.socials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.social-card {
+  border: 1px solid #00e5ff;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #fff;
+  transition: all 0.2s ease;
+  background: rgba(13, 25, 41, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.social-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.social-card:hover::before {
+  opacity: 1;
+}
+
+.social-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+  border-color: #00e5ff;
+}
+
+.social-card.selected {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.8), rgba(0, 180, 255, 0.6));
+  color: #000;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.1);
+  border-color: #00e5ff;
+  transform: scale(1.02);
+}
+
+.social-card.selected span {
+  color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* PRESETS */
+.presets-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.preset-card {
+  background: rgba(13, 25, 41, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.preset-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.preset-card:hover::before {
+  opacity: 1;
+}
+
+.preset-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 229, 255, 0.3);
+  border-color: rgba(0, 229, 255, 0.5);
+}
+
+.preset-card.active-preset {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(0, 180, 255, 0.1));
+  border-color: #00e5ff;
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.4), inset 0 0 20px rgba(0, 229, 255, 0.1);
+  transform: scale(1.02);
+}
+
+.preset-card.active-preset h4 {
+  color: #00e5ff;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.preset-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  transition: color 0.3s ease;
+}
+
+.preset-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+/* HI-END MODULES */
+.hi-end-item {
+  background: rgba(13, 25, 41, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.hi-end-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.05) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.hi-end-item:hover::before {
+  opacity: 1;
+}
+
+.hi-end-item:hover {
+  transform: translateX(4px);
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.2);
+}
+
+.hi-end-item .info {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.hi-end-item .price {
+  color: #00e5ff;
+  text-shadow: 0 0 5px rgba(0, 229, 255, 0.5);
+}
+
+/* TOGGLE SWITCH */
+.switch {
+  cursor: pointer;
+  position: relative;
+}
+
+.switch .slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  border-radius: 9999px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.switch input:checked ~ .slider {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+}
+
+/* TRAINING CARD */
+.training-block-wrapper {
+  margin-top: 20px;
+}
+
+.training-card {
+  border: 2px solid #ffd700;
+  background: linear-gradient(135deg, rgba(50, 50, 50, 0.9), rgba(0, 0, 0, 0.9));
+  padding: 24px;
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.training-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
+  animation: gold-pulse 3s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.training-card:hover::before {
+  opacity: 1;
+}
+
+.training-card.active-training {
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.6), inset 0 0 30px rgba(255, 215, 0, 0.1);
+  transform: scale(1.02);
+}
+
+.training-card.active-training::before {
+  opacity: 1;
+}
+
+.training-glow {
+  pointer-events: none;
+}
+
+.training-content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+@keyframes gold-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.6;
+  }
+}
+
+/* FACTORY CONTAINER */
+.factory-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .socials-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .presets-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .training-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .training-content .icon {
+    align-self: center;
+  }
+}
+
+/* PRICE ANIMATIONS */
+@keyframes price-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.price-update {
+  animation: price-pulse 0.3s ease-out;
+}
+
+/* TOTAL PRICE DISPLAY */
+.total-price-container {
+  position: relative;
+  display: inline-block;
+}
+
+.total-price-display {
+  transition: color 0.2s ease;
+}
+
+/* ==================== iOS-STYLE TOGGLES ==================== */
+
+/* --- iOS Switch Container --- */
+.switch-ios {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0; /* Prevent squeezing in flexbox */
+  /* Ensure touch target is large enough on mobile */
+  min-width: 50px;
+  min-height: 28px;
+}
+
+/* --- The Track (Background) --- */
+.slider-ios {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #363636; /* Dark Gray (Off State) */
+  transition: 0.4s;
+  border-radius: 34px;
+  border: 1px solid rgba(255,255,255,0.1); /* Subtle border */
+  pointer-events: none; /* Let parent handle all clicks */
+}
+
+/* --- The Knob (Circle) --- */
+.slider-ios::before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Shadow for 3D effect */
+}
+
+/* --- Active State (ON) via class --- */
+.slider-ios.switch-on {
+  background-color: #4cd964; 
+  border-color: #4cd964;
+}
+
+/* --- Move knob when active --- */
+.slider-ios.switch-on::before {
+  transform: translateX(21px);
+}
+

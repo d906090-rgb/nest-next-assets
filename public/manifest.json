@@ -1,0 +1,22 @@
+{
+  "name": "Нейро Завод",
+  "short_name": "Нейро Завод",
+  "description": "Платформа AI-автоматизации контента: генерация видео, изображений и аудио, автопостинг 24/7.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#00F0FF",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/logo-ai.png",
+      "sizes": "300x300",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-ai.webp",
+      "sizes": "300x300",
+      "type": "image/webp"
+    }
+  ]
+}

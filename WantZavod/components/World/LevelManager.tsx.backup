@@ -1,0 +1,599 @@
+
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
+
+
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { Text } from '@react-three/drei';
+import { useStore } from '../../store';
+import { GameObject, ObjectType, LANE_WIDTH, SPAWN_DISTANCE, REMOVE_DISTANCE, GameStatus, GEMINI_COLORS } from '../../types';
+import { audio } from '../System/Audio';
+
+// Optimized Geometry Constants - Single mesh per object where possible
+const OBSTACLE_HEIGHT = 1.6;
+const OBSTACLE_GEOMETRY = new THREE.ConeGeometry(0.8, OBSTACLE_HEIGHT, 8);
+
+// Logo Geometries (Simplified Gem)
+const LOGO_GEO = new THREE.CylinderGeometry(0.4, 0.4, 0.15, 16);
+
+// Alien Geometries (Simplified)
+const ALIEN_GEO = new THREE.CapsuleGeometry(0.4, 0.4, 4, 8);
+
+// Missile Geometries (Simplified)
+const MISSILE_GEO = new THREE.CylinderGeometry(0.1, 0.1, 2.5, 8);
+
+// Shadow Geometries
+const SHADOW_LETTER_GEO = new THREE.PlaneGeometry(1.5, 0.5);
+const SHADOW_CIRCLE_GEO = new THREE.CircleGeometry(0.6, 16);
+const SHADOW_MISSILE_GEO = new THREE.PlaneGeometry(0.2, 2.5);
+
+// Shop Geometries
+const SHOP_FRAME_GEO = new THREE.BoxGeometry(1, 7, 1); 
+const SHOP_BACK_GEO = new THREE.BoxGeometry(1, 5, 1.2); 
+const SHOP_OUTLINE_GEO = new THREE.BoxGeometry(1, 7.2, 0.8); 
+const SHOP_FLOOR_GEO = new THREE.PlaneGeometry(1, 4); 
+
+// Reduced particle count for better performance stability
+const PARTICLE_COUNT = 200; 
+const BASE_LETTER_INTERVAL = 110; 
+
+const getLetterInterval = (level: number) => {
+    return BASE_LETTER_INTERVAL * Math.pow(1.3, Math.max(0, level - 1));
+};
+
+const MISSILE_SPEED = 30; 
+const RUSSIAN_FONT_URL = '/assets/russo-one.ttf';
+
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// Shared Materials (Global reuse to prevent GPU memory leaks)
+const MAT_OBSTACLE = new THREE.MeshStandardMaterial({ 
+    color: "#330011", emissive: "#ff0054", emissiveIntensity: 0.2, roughness: 0.3, metalness: 0.8, flatShading: true 
+});
+const MAT_ALIEN = new THREE.MeshStandardMaterial({ 
+    color: "#4400cc", emissive: "#00ff00", emissiveIntensity: 0.5, metalness: 0.8, roughness: 0.2 
+});
+const MAT_MISSILE = new THREE.MeshStandardMaterial({ 
+    color: "#ff0000", emissive: "#ff0000", emissiveIntensity: 4 
+});
+const MAT_GEM = new THREE.MeshStandardMaterial({ 
+    color: "#0066ff", emissive: "#00ffff", emissiveIntensity: 0.8, metalness: 0.9, roughness: 0.1 
+});
+const MAT_SHADOW = new THREE.MeshBasicMaterial({ 
+    color: "#000000", opacity: 0.3, transparent: true 
+});
+const MAT_SHOP_FRAME = new THREE.MeshStandardMaterial({ color: "#111111", metalness: 0.8, roughness: 0.2 });
+const MAT_SHOP_BACK = new THREE.MeshBasicMaterial({ color: "#000000" });
+const MAT_SHOP_FLOOR = new THREE.MeshBasicMaterial({ color: "#00ffff", transparent: true, opacity: 0.3 });
+
+// Note: Text.preload was removed in newer @react-three/drei versions
+// Font will be loaded on first use
+
+// Memoized Particle System to prevent re-renders affecting performance
+const ParticleSystem = React.memo(() => {
+    const mesh = useRef<THREE.InstancedMesh>(null);
+    const dummy = useMemo(() => new THREE.Object3D(), []);
+    
+    // Static initial state
+    const particles = useMemo(() => new Array(PARTICLE_COUNT).fill(0).map(() => ({
+        life: 0,
+        pos: new THREE.Vector3(),
+        vel: new THREE.Vector3(),
+        rot: new THREE.Vector3(),
+        rotVel: new THREE.Vector3(),
+        color: new THREE.Color()
+    })), []);
+
+    useEffect(() => {
+        const handleExplosion = (e: CustomEvent) => {
+            const { position, color } = e.detail;
+            let spawned = 0;
+            const burstAmount = 30; 
+
+            for(let i = 0; i < PARTICLE_COUNT; i++) {
+                const p = particles[i];
+                if (p.life <= 0) {
+                    p.life = 1.0 + Math.random() * 0.5; 
+                    p.pos.set(position[0], position[1], position[2]);
+                    
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const speed = 2 + Math.random() * 10;
+                    
+                    p.vel.set(
+                        Math.sin(phi) * Math.cos(theta),
+                        Math.sin(phi) * Math.sin(theta),
+                        Math.cos(phi)
+                    ).multiplyScalar(speed);
+
+                    p.rot.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                    p.rotVel.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).multiplyScalar(5);
+                    
+                    p.color.set(color);
+                    
+                    spawned++;
+                    if (spawned >= burstAmount) break;
+                }
+            }
+        };
+        
+        window.addEventListener('particle-burst', handleExplosion as any);
+        return () => window.removeEventListener('particle-burst', handleExplosion as any);
+    }, [particles]);
+
+    useFrame((state, delta) => {
+        if (!mesh.current) return;
+        const safeDelta = Math.min(delta, 0.1);
+
+        let needsUpdate = false;
+        for(let i = 0; i < PARTICLE_COUNT; i++) {
+            const p = particles[i];
+            if (p.life > 0) {
+                p.life -= safeDelta * 1.5;
+                
+                // Optimized movement
+                p.pos.x += p.vel.x * safeDelta;
+                p.pos.y += p.vel.y * safeDelta;
+                p.pos.z += p.vel.z * safeDelta;
+                
+                p.vel.y -= safeDelta * 5; 
+                p.vel.multiplyScalar(0.98);
+
+                p.rot.x += p.rotVel.x * safeDelta;
+                p.rot.y += p.rotVel.y * safeDelta;
+                
+                dummy.position.copy(p.pos);
+                const scale = Math.max(0, p.life * 0.25);
+                dummy.scale.set(scale, scale, scale);
+                
+                dummy.rotation.set(p.rot.x, p.rot.y, p.rot.z);
+                dummy.updateMatrix();
+                
+                mesh.current.setMatrixAt(i, dummy.matrix);
+                mesh.current.setColorAt(i, p.color);
+                needsUpdate = true;
+            } else if (p.life > -1) {
+                // One-time hide when particle dies
+                dummy.scale.set(0,0,0);
+                dummy.updateMatrix();
+                mesh.current.setMatrixAt(i, dummy.matrix);
+                p.life = -1; // Mark as completely dead and hidden
+                needsUpdate = true;
+            }
+        }
+        
+        if (needsUpdate) {
+             mesh.current.instanceMatrix.needsUpdate = true;
+             if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+        }
+    });
+
+    return (
+        <instancedMesh ref={mesh} args={[undefined, undefined, PARTICLE_COUNT]}>
+            <octahedronGeometry args={[0.5, 0]} />
+            <meshBasicMaterial toneMapped={false} transparent opacity={0.9} />
+        </instancedMesh>
+    );
+});
+
+
+const tmpVec3A = new THREE.Vector3();
+const tmpVec3B = new THREE.Vector3();
+
+const getRandomLane = (laneCount: number) => {
+    const max = Math.floor(laneCount / 2);
+    return Math.floor(Math.random() * (max * 2 + 1)) - max;
+};
+
+export const LevelManager: React.FC = () => {
+  // CRITICAL OPTIMIZATION:
+  // Split store selectors to avoid re-rendering LevelManager whenever 'score' or 'lives' changes.
+  // We only need reactive updates for status, level, speed, and laneCount.
+  // Actions are stable functions.
+  
+  const status = useStore(s => s.status);
+  const speed = useStore(s => s.speed);
+  const collectedLetters = useStore(s => s.collectedLetters);
+  const laneCount = useStore(s => s.laneCount);
+  const level = useStore(s => s.level);
+  
+  // Fetch actions non-reactively or use stable references
+  const collectGem = useStore(s => s.collectGem);
+  const collectLetter = useStore(s => s.collectLetter);
+  const setDistance = useStore(s => s.setDistance);
+  const openShop = useStore(s => s.openShop);
+  
+  const objectsRef = useRef<GameObject[]>([]);
+  // Use a simple counter to force re-render ONLY when object list structure changes
+  const [renderTrigger, setRenderTrigger] = useState(0);
+  const prevStatus = useRef(status);
+  const prevLevel = useRef(level);
+
+  const playerObjRef = useRef<THREE.Object3D | null>(null);
+  const playerPos = useMemo(() => new THREE.Vector3(), []);
+  const distanceTraveled = useRef(0);
+  const nextLetterDistance = useRef(BASE_LETTER_INTERVAL);
+
+  const TARGET_WORD = ['Х', 'О', 'Ч', 'У', 'З', 'А', 'В', 'О', 'Д'];
+
+  useEffect(() => {
+    const isRestart = status === GameStatus.PLAYING && prevStatus.current === GameStatus.GAME_OVER;
+    const isMenuReset = status === GameStatus.MENU;
+    const isLevelUp = level !== prevLevel.current && status === GameStatus.PLAYING;
+    const isVictoryReset = status === GameStatus.PLAYING && prevStatus.current === GameStatus.VICTORY;
+
+    if (isMenuReset || isRestart || isVictoryReset) {
+        objectsRef.current = [];
+        setRenderTrigger(t => t + 1);
+        distanceTraveled.current = 0;
+        nextLetterDistance.current = getLetterInterval(1);
+
+    } else if (isLevelUp && level > 1) {
+        objectsRef.current = objectsRef.current.filter(obj => obj.position[2] > -80);
+        objectsRef.current.push({
+            id: generateId(),
+            type: ObjectType.SHOP_PORTAL,
+            position: [0, 0, -100], 
+            active: true,
+        });
+        
+        nextLetterDistance.current = distanceTraveled.current - SPAWN_DISTANCE + getLetterInterval(level);
+        setRenderTrigger(t => t + 1);
+        
+    } else if (status === GameStatus.GAME_OVER || status === GameStatus.VICTORY) {
+        setDistance(Math.floor(distanceTraveled.current));
+    }
+    
+    prevStatus.current = status;
+    prevLevel.current = level;
+  }, [status, level, setDistance]);
+
+  useFrame((state, delta) => {
+    if (status !== GameStatus.PLAYING) return;
+
+    const safeDelta = Math.min(delta, 0.05); 
+    const dist = speed * safeDelta;
+    
+    distanceTraveled.current += dist;
+
+    let hasChanges = false;
+    
+    if (playerObjRef.current) {
+        playerObjRef.current.getWorldPosition(playerPos);
+    } else {
+        // Fallback or initialization of player reference (attempt only occasionally)
+        if (state.clock.frame % 15 === 0) {
+            const group = state.scene.getObjectByName('PlayerGroup');
+            if (group && group.children.length > 0) {
+                playerObjRef.current = group.children[0];
+                playerObjRef.current.getWorldPosition(playerPos);
+            } else {
+                playerPos.set(0, 0, 0);
+            }
+        }
+    }
+
+    // 1. Move & Update
+    const currentObjects = objectsRef.current;
+    const keptObjects: GameObject[] = [];
+    const newSpawns: GameObject[] = [];
+
+    // HARD CAP: If somehow we have too many objects, force purge old ones
+    if (currentObjects.length > 40) {
+        currentObjects.splice(0, currentObjects.length - 24);
+    }
+
+    for (const obj of currentObjects) {
+        if (!obj.position || isNaN(obj.position[2])) continue;
+
+        let moveAmount = dist;
+        if (obj.type === ObjectType.MISSILE) {
+            moveAmount += MISSILE_SPEED * safeDelta;
+        }
+
+        const prevZ = obj.position[2];
+        obj.position[2] += moveAmount;
+        
+        // Safety check for NaN
+        if (isNaN(obj.position[2])) {
+            obj.active = false;
+            continue;
+        }
+        
+        if (obj.type === ObjectType.ALIEN && obj.active && !obj.hasFired) {
+             if (obj.position[2] > -90) {
+                 obj.hasFired = true;
+                 newSpawns.push({
+                     id: generateId(),
+                     type: ObjectType.MISSILE,
+                     position: [obj.position[0], 1.0, obj.position[2] + 2], 
+                     active: true,
+                     color: '#ff0000'
+                 });
+                 hasChanges = true;
+                 window.dispatchEvent(new CustomEvent('particle-burst', { 
+                    detail: { position: obj.position, color: '#ff00ff' } 
+                 }));
+             }
+        }
+
+        let keep = true;
+        if (obj.active) {
+            const zThreshold = 2.0; 
+            const inZZone = (prevZ < playerPos.z + zThreshold) && (obj.position[2] > playerPos.z - zThreshold);
+            
+            if (obj.type === ObjectType.SHOP_PORTAL) {
+                const dz = Math.abs(obj.position[2] - playerPos.z);
+                if (dz < 2) { 
+                     openShop();
+                     obj.active = false;
+                     hasChanges = true;
+                     keep = false; 
+                }
+            } else if (inZZone) {
+                const dx = Math.abs(obj.position[0] - playerPos.x);
+                // Faster collision check using absolute difference
+                if (dx < 0.9) { 
+                     const isDamageSource = obj.type === ObjectType.OBSTACLE || obj.type === ObjectType.ALIEN || obj.type === ObjectType.MISSILE;
+                     if (isDamageSource) {
+                         window.dispatchEvent(new Event('player-hit'));
+                         obj.active = false; 
+                         hasChanges = true;
+                         if (obj.type === ObjectType.MISSILE) {
+                            window.dispatchEvent(new CustomEvent('particle-burst', { 
+                                detail: { position: obj.position, color: '#ff4400' } 
+                            }));
+                         }
+                     } else {
+                         // Item Collection
+                         if (obj.type === ObjectType.GEM) {
+                             collectGem(obj.points || 50);
+                             audio.playGemCollect();
+                         }
+                         if (obj.type === ObjectType.LETTER && obj.targetIndex !== undefined) {
+                             collectLetter(obj.targetIndex);
+                             audio.playLetterCollect();
+                         }
+                         
+                         window.dispatchEvent(new CustomEvent('particle-burst', { 
+                             detail: { position: obj.position, color: obj.color || '#ffffff' } 
+                         }));
+
+                         obj.active = false;
+                         hasChanges = true;
+                     }
+                }
+            }
+        }
+
+        if (obj.position[2] > REMOVE_DISTANCE) {
+            keep = false;
+            hasChanges = true;
+        }
+
+        if (keep) keptObjects.push(obj);
+    }
+
+    if (newSpawns.length > 0) keptObjects.push(...newSpawns);
+
+    // 2. Spawning Logic
+    let furthestZ = 0;
+    const staticObjects = keptObjects.filter(o => o.type !== ObjectType.MISSILE);
+    
+    if (staticObjects.length > 0) {
+        furthestZ = Math.min(...staticObjects.map(o => o.position[2]));
+    } else {
+        furthestZ = -20;
+    }
+
+    if (furthestZ > -SPAWN_DISTANCE) {
+         const minGap = 12 + (speed * 0.4); 
+         const spawnZ = Math.min(furthestZ - minGap, -SPAWN_DISTANCE);
+         const isLetterDue = distanceTraveled.current >= nextLetterDistance.current;
+
+         // Ensure we don't spawn right on top of another object due to floating point checks
+         // Only spawn if we are significantly past the last spawn
+         if (spawnZ < furthestZ - 5) {
+             if (isLetterDue) {
+                 const lane = getRandomLane(laneCount);
+                 const availableIndices = TARGET_WORD.map((_, i) => i).filter(i => !collectedLetters.includes(i));
+
+                 if (availableIndices.length > 0) {
+                     const chosenIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+                     const val = TARGET_WORD[chosenIndex];
+                     const color = GEMINI_COLORS[chosenIndex];
+
+                     keptObjects.push({
+                        id: generateId(),
+                        type: ObjectType.LETTER,
+                        position: [lane * LANE_WIDTH, 1.0, spawnZ], 
+                        active: true,
+                        color: color,
+                        value: val,
+                        targetIndex: chosenIndex
+                     });
+                     nextLetterDistance.current += getLetterInterval(level);
+                     hasChanges = true;
+                 } else {
+                    keptObjects.push({
+                        id: generateId(),
+                        type: ObjectType.GEM,
+                        position: [lane * LANE_WIDTH, 1.2, spawnZ],
+                        active: true,
+                        color: '#00ffff',
+                        points: 50
+                    });
+                    hasChanges = true;
+                 }
+             } else if (Math.random() > 0.1) {
+                const isObstacle = Math.random() > 0.20;
+                if (isObstacle) {
+                    const spawnAlien = level >= 2 && Math.random() < 0.2; 
+                    if (spawnAlien) {
+                        const lane = getRandomLane(laneCount);
+                        keptObjects.push({
+                            id: generateId(),
+                            type: ObjectType.ALIEN,
+                            position: [lane * LANE_WIDTH, 1.5, spawnZ],
+                            active: true,
+                            color: '#00ff00',
+                            hasFired: false
+                        });
+                    } else {
+                        const lane = getRandomLane(laneCount);
+                        keptObjects.push({
+                            id: generateId(),
+                            type: ObjectType.OBSTACLE,
+                            position: [lane * LANE_WIDTH, OBSTACLE_HEIGHT / 2, spawnZ],
+                            active: true,
+                            color: '#ff0054'
+                        });
+                    }
+                } else {
+                    const lane = getRandomLane(laneCount);
+                    keptObjects.push({
+                        id: generateId(),
+                        type: ObjectType.GEM,
+                        position: [lane * LANE_WIDTH, 1.2, spawnZ],
+                        active: true,
+                        color: '#00ffff',
+                        points: 50
+                    });
+                }
+                hasChanges = true;
+             }
+         }
+    }
+
+    if (hasChanges) {
+        objectsRef.current = keptObjects;
+        setRenderTrigger(t => t + 1);
+    }
+  });
+
+  return (
+    <group>
+      <ParticleSystem />
+      {objectsRef.current.map(obj => {
+        if (!obj.active) return null;
+        return <GameEntity key={obj.id} data={obj} />;
+      })}
+    </group>
+  );
+};
+
+const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const visualRef = useRef<THREE.Group>(null);
+    const shadowRef = useRef<THREE.Mesh>(null);
+    const laneCount = useStore(s => s.laneCount);
+    
+    useFrame((state, delta) => {
+        // 1. Move Main Container
+        if (groupRef.current) {
+            groupRef.current.position.set(data.position[0], 0, data.position[2]);
+        }
+
+        // 2. Animate Visuals
+        if (visualRef.current) {
+            const baseHeight = data.position[1];
+            
+            if (data.type === ObjectType.SHOP_PORTAL) {
+                 visualRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 2) * 0.02);
+            } else if (data.type === ObjectType.MISSILE) {
+                 visualRef.current.rotation.z += delta * 20; 
+                 visualRef.current.position.y = baseHeight;
+            } else if (data.type === ObjectType.ALIEN) {
+                 visualRef.current.position.y = baseHeight + Math.sin(state.clock.elapsedTime * 3) * 0.2;
+                 visualRef.current.rotation.y += delta;
+            } else if (data.type !== ObjectType.OBSTACLE) {
+                if (data.type === ObjectType.GEM) {
+                     visualRef.current.rotation.y += delta * 2;
+                     visualRef.current.position.y = baseHeight + Math.sin(state.clock.elapsedTime * 3) * 0.1;
+                } else {
+                     visualRef.current.rotation.y += delta * 3;
+                     const bobOffset = Math.sin(state.clock.elapsedTime * 4 + data.position[0]) * 0.1;
+                     visualRef.current.position.y = baseHeight + bobOffset;
+                    if (shadowRef.current) {
+                        const shadowScale = 1 - bobOffset; 
+                        shadowRef.current.scale.setScalar(shadowScale);
+                    }
+                }
+            } else {
+                visualRef.current.position.y = baseHeight;
+            }
+        }
+    });
+
+    const shadowGeo = useMemo(() => {
+        if (data.type === ObjectType.LETTER) return SHADOW_LETTER_GEO;
+        if (data.type === ObjectType.MISSILE) return SHADOW_MISSILE_GEO;
+        if (data.type === ObjectType.SHOP_PORTAL) return null; 
+        return SHADOW_CIRCLE_GEO; 
+    }, [data.type]);
+
+    return (
+        <group ref={groupRef} position={[data.position[0], 0, data.position[2]]}>
+            {data.type !== ObjectType.SHOP_PORTAL && shadowGeo && (
+                <mesh ref={shadowRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} geometry={shadowGeo} material={MAT_SHADOW} />
+            )}
+
+            <group ref={visualRef} position={[0, data.position[1], 0]}>
+                {/* --- SHOP PORTAL --- */}
+                {data.type === ObjectType.SHOP_PORTAL && (
+                    <group>
+                         <mesh position={[0, 3, 0]} geometry={SHOP_FRAME_GEO} scale={[laneCount * LANE_WIDTH + 2, 1, 1]} material={MAT_SHOP_FRAME} />
+                         <mesh position={[0, 2, 0]} geometry={SHOP_BACK_GEO} scale={[laneCount * LANE_WIDTH, 1, 1]} material={MAT_SHOP_BACK} />
+                         <Text 
+                            position={[0, 5, 0.6]}
+                            font={RUSSIAN_FONT_URL} 
+                            fontSize={1.2} 
+                            color="#ffff00"
+                            anchorX="center"
+                            anchorY="middle"
+                         >
+                             КИБЕР ЛАРЕК
+                         </Text>
+                         <mesh position={[0, 0.1, 0]} rotation={[-Math.PI/2, 0, 0]} geometry={SHOP_FLOOR_GEO} scale={[laneCount * LANE_WIDTH, 1, 1]} material={MAT_SHOP_FLOOR} />
+                    </group>
+                )}
+
+                {/* --- OBSTACLE (Simplified) --- */}
+                {data.type === ObjectType.OBSTACLE && (
+                    <mesh geometry={OBSTACLE_GEOMETRY} material={MAT_OBSTACLE} />
+                )}
+
+                {/* --- ALIEN (Simplified) --- */}
+                {data.type === ObjectType.ALIEN && (
+                    <mesh geometry={ALIEN_GEO} material={MAT_ALIEN} />
+                )}
+
+                {/* --- MISSILE (Simplified) --- */}
+                {data.type === ObjectType.MISSILE && (
+                    <mesh rotation={[Math.PI / 2, 0, 0]} geometry={MISSILE_GEO} material={MAT_MISSILE} />
+                )}
+
+                {/* --- GEM -> Simplified 3D Coin --- */}
+                {data.type === ObjectType.GEM && (
+                    <mesh rotation={[Math.PI / 2, 0, 0]} geometry={LOGO_GEO} material={MAT_GEM} />
+                )}
+
+                {/* --- LETTER (Simplified to avoid dynamic Text GPU overhead) --- */}
+                {data.type === ObjectType.LETTER && (
+                    <mesh>
+                        <boxGeometry args={[0.8, 0.8, 0.8]} />
+                        <meshStandardMaterial 
+                            color={data.color} 
+                            emissive={data.color} 
+                            emissiveIntensity={2} 
+                        />
+                    </mesh>
+                )}
+            </group>
+        </group>
+    );
+});
