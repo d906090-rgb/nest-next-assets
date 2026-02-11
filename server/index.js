@@ -2,21 +2,76 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { OpenAI } from 'openai';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = new Set(['https://tecai.ru', 'https://www.tecai.ru']);
+
+app.use(helmet());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+  }),
+);
+app.use(express.json({ limit: '10kb' }));
+
+const baseApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Chat rate limit exceeded, please try again later.' },
+});
+
+const telegramLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Telegram rate limit exceeded, please try again later.' },
+});
+
+const imageCreateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Image generation rate limit exceeded, please try again later.' },
+});
+
+app.use('/api', baseApiLimiter);
+
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // OpenAI Chat endpoint
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', chatLimiter, async (req, res) => {
   try {
     const { message } = req.body;
+    if (!isNonEmptyString(message) || message.length > 2000) {
+      return res.status(400).json({ error: 'Invalid "message". Must be a non-empty string up to 2000 chars.' });
+    }
     const currentDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     const response = await openai.chat.completions.create({
@@ -52,9 +107,15 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // Kie.ai Image Generation endpoints
-app.post('/api/image/create', async (req, res) => {
+app.post('/api/image/create', imageCreateLimiter, async (req, res) => {
   try {
     const { prompt, aspectRatio } = req.body;
+    if (!isNonEmptyString(prompt) || prompt.length > 2000) {
+      return res.status(400).json({ error: 'Invalid "prompt". Must be a non-empty string up to 2000 chars.' });
+    }
+    if (aspectRatio && typeof aspectRatio !== 'string') {
+      return res.status(400).json({ error: 'Invalid "aspectRatio". Must be a string when provided.' });
+    }
     const apiKey = process.env.KIE_AI_API_KEY;
 
     const response = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
@@ -83,6 +144,9 @@ app.post('/api/image/create', async (req, res) => {
 app.get('/api/image/status/:taskId', async (req, res) => {
   try {
     const { taskId } = req.params;
+    if (!isNonEmptyString(taskId) || taskId.length > 128) {
+      return res.status(400).json({ error: 'Invalid "taskId".' });
+    }
     const apiKey = process.env.KIE_AI_API_KEY;
 
     const response = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
@@ -100,9 +164,12 @@ app.get('/api/image/status/:taskId', async (req, res) => {
 });
 
 // Telegram endpoint
-app.post('/api/telegram', async (req, res) => {
+app.post('/api/telegram', telegramLimiter, async (req, res) => {
   try {
     const { text } = req.body;
+    if (!isNonEmptyString(text) || text.length > 2000) {
+      return res.status(400).json({ error: 'Invalid "text". Must be a non-empty string up to 2000 chars.' });
+    }
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
@@ -131,7 +198,14 @@ app.post('/api/telegram', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
+app.use((error, req, res, next) => {
+  if (error && error.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'Origin is not allowed' });
+  }
+  return next(error);
+});
+
+const PORT = process.env.PORT || 3004;
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
 });
