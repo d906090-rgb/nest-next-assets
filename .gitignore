@@ -53,3 +53,4 @@ server/package-lock.json
 # Built JS/CSS bundles in assets/ (served from dist/ in production)
 assets/index-*.js
 assets/index-*.css
+mcp.json
