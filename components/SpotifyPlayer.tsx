@@ -30,7 +30,7 @@ interface Album {
   id: string;
   title: string;
   artist: string;
-  coverUrl: string;
+  coverUrl: string | null;
   coverGenerated: boolean;
   trackCount: number;
   tracks: Track[];
@@ -43,7 +43,32 @@ interface MusicMetadata {
   syncStatus: 'never' | 'syncing' | 'success' | 'error';
   channelUsername: string;
   totalTracks: number;
+  coverJobs?: Record<
+    string,
+    {
+      taskId?: string;
+      status?: 'processing' | 'success' | 'error';
+      updatedAt?: string;
+      reason?: string | null;
+    }
+  >;
 }
+
+const LIKED_TRACKS_KEY = 'neuro-music-liked-tracks';
+
+const loadLikedTracks = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(LIKED_TRACKS_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch { /* ignore corrupt data */ }
+  return new Set();
+};
+
+const saveLikedTracks = (set: Set<string>) => {
+  try {
+    localStorage.setItem(LIKED_TRACKS_KEY, JSON.stringify([...set]));
+  } catch { /* storage full or unavailable */ }
+};
 
 interface SpotifyPlayerProps {
   lang: 'en' | 'ru';
@@ -66,56 +91,71 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<'off' | 'all' | 'one'>('off');
-  const [likedTracks, setLikedTracks] = useState<Set<string>>(new Set());
+  const [likedTracks, setLikedTracks] = useState<Set<string>>(loadLikedTracks);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const handleNextRef = useRef<() => void>(() => {});
+  const audioListenersAttached = useRef(false);
+
+  const applyMetadata = useCallback((data: MusicMetadata) => {
+    setMetadata(data);
+
+    setSelectedAlbum((previousAlbum) => {
+      if (!data.albums.length) {
+        return null;
+      }
+
+      if (previousAlbum) {
+        const updatedAlbum = data.albums.find((album) => album.id === previousAlbum.id);
+        if (updatedAlbum) return updatedAlbum;
+      }
+
+      return data.albums[0];
+    });
+
+    setCurrentTrack((previousTrack) => {
+      if (!previousTrack) return previousTrack;
+      const album = data.albums.find((item) => item.id === previousTrack.albumId);
+      if (!album) return null;
+      return album.tracks.find((track) => track.id === previousTrack.id) || null;
+    });
+  }, []);
+
+  const loadMetadata = useCallback(async () => {
+    const response = await fetch('/api/music/albums');
+    if (!response.ok) {
+      throw new Error(`Failed to load metadata: ${response.status}`);
+    }
+    const data = (await response.json()) as MusicMetadata;
+    applyMetadata(data);
+    return data;
+  }, [applyMetadata]);
 
   // Load music metadata
   useEffect(() => {
-    const loadMetadata = async () => {
+    const init = async () => {
       try {
-        const response = await fetch('/api/music/albums');
-        if (response.ok) {
-          const data = await response.json();
-          setMetadata(data);
-          if (data.albums.length > 0) {
-            setSelectedAlbum(data.albums[0]);
-          }
-        }
+        await loadMetadata();
       } catch (error) {
         console.error('Failed to load music metadata:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    loadMetadata();
-  }, []);
+    init();
+  }, [loadMetadata]);
 
-  // Audio event handlers
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  // Attach audio event listeners via callback ref (avoids timing issues with useEffect + useRef)
+  const attachAudioListeners = useCallback((audio: HTMLAudioElement) => {
+    if (audioListenersAttached.current) return;
+    audioListenersAttached.current = true;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handleEnded = () => handleNext();
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-    };
+    audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
+    audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
+    audio.addEventListener('ended', () => handleNextRef.current());
+    audio.addEventListener('play', () => setIsPlaying(true));
+    audio.addEventListener('pause', () => setIsPlaying(false));
   }, []);
 
   // Update volume
@@ -127,18 +167,32 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
 
   const playTrack = useCallback((track: Track) => {
     setCurrentTrack(track);
-    if (audioRef.current) {
-      audioRef.current.src = track.audioUrl;
-      audioRef.current.play().catch(console.error);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.src = track.audioUrl;
+      audio.load();
+      audio.play().catch((err) => {
+        console.error('playTrack play() failed:', err);
+      });
+    } else {
+      console.error('playTrack: audioRef.current is null');
     }
   }, []);
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current || !currentTrack) return;
+    const audio = audioRef.current;
+    if (!audio || !currentTrack) return;
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
     } else {
-      audioRef.current.play().catch(console.error);
+      // If src not set yet (e.g. page just loaded), set it
+      if (!audio.src || audio.src === window.location.href) {
+        audio.src = currentTrack.audioUrl;
+        audio.load();
+      }
+      audio.play().catch((err) => {
+        console.error('togglePlay play() failed:', err);
+      });
     }
   }, [isPlaying, currentTrack]);
 
@@ -181,11 +235,17 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
     }
   }, [selectedAlbum, currentTrack, shuffle, repeat, playTrack]);
 
+  // Keep ref always pointing to the latest handleNext
+  useEffect(() => {
+    handleNextRef.current = handleNext;
+  }, [handleNext]);
+
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
+    const audio = audioRef.current;
+    if (audio && audio.duration) {
+      audio.currentTime = time;
     }
   }, []);
 
@@ -197,6 +257,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
       } else {
         newSet.add(trackId);
       }
+      saveLikedTracks(newSet);
       return newSet;
     });
   }, []);
@@ -206,19 +267,8 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
     try {
       const response = await fetch('/api/music/sync', { method: 'POST' });
       if (response.ok) {
-        const data = await response.json();
-        setMetadata(data);
-        if (data.albums.length > 0) {
-          if (!selectedAlbum) {
-            setSelectedAlbum(data.albums[0]);
-          } else {
-            const refreshedAlbum = data.albums.find((album) => album.id === selectedAlbum.id);
-            setSelectedAlbum(refreshedAlbum || data.albums[0]);
-          }
-        } else {
-          setSelectedAlbum(null);
-          setCurrentTrack(null);
-        }
+        const data = (await response.json()) as MusicMetadata;
+        applyMetadata(data);
       }
     } catch (error) {
       console.error('Sync failed:', error);
@@ -226,6 +276,24 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
       setIsSyncing(false);
     }
   };
+
+  // Auto-refresh metadata while cover generation is still processing.
+  useEffect(() => {
+    const hasProcessingCover = Object.values(metadata?.coverJobs || {}).some(
+      (job) => job?.status === 'processing',
+    );
+    if (!hasProcessingCover) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await loadMetadata();
+      } catch (error) {
+        console.error('Failed to refresh cover status:', error);
+      }
+    }, 4000);
+
+    return () => clearTimeout(timeoutId);
+  }, [metadata, loadMetadata]);
 
   const t = {
     albums: lang === 'ru' ? 'Альбомы' : 'Albums',
@@ -243,22 +311,28 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96 bg-linear-to-b from-zinc-900 to-black rounded-xl">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      <div className="flex items-center justify-center h-96 bg-linear-to-b from-[#0D1629] to-black rounded-xl">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00F0FF]"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-linear-to-b from-zinc-900 via-zinc-900 to-black rounded-xl overflow-hidden shadow-2xl">
+    <div className="bg-linear-to-b from-[#101A2F] via-[#0E172A] to-black rounded-xl overflow-hidden shadow-2xl border border-white/10">
       {/* Hidden audio element */}
-      <audio ref={audioRef} preload="metadata" />
+      <audio
+        ref={(el) => {
+          audioRef.current = el;
+          if (el) attachAudioListeners(el);
+        }}
+        preload="metadata"
+      />
 
       <div className="flex h-[600px]">
         {/* Sidebar - Albums */}
         <div className="w-64 bg-black p-4 flex flex-col">
           <div className="flex items-center gap-3 mb-6">
-            <Disc className="w-8 h-8 text-green-500" />
+            <Disc className="w-8 h-8 text-[#00F0FF]" />
             <span className="text-white font-bold text-lg">{t.neuroMusic}</span>
           </div>
 
@@ -266,7 +340,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            className="mb-4 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
+            className="mb-4 flex items-center justify-center gap-2 bg-[#00F0FF] hover:bg-[#31F5FF] disabled:bg-[#006A73] text-black px-4 py-2 rounded-full text-sm font-semibold transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? t.syncing : t.syncWithTelegram}
@@ -317,7 +391,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
         </div>
 
         {/* Main content - Track list */}
-        <div className="flex-1 bg-linear-to-b from-zinc-800/50 to-zinc-900 flex flex-col">
+        <div className="flex-1 bg-linear-to-b from-[#16233D]/60 to-[#0C1424] flex flex-col">
           {/* Album header */}
           {selectedAlbum && (
             <div className="p-6 bg-linear-to-b from-zinc-700/30 to-transparent">
@@ -376,20 +450,46 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedAlbum.tracks.map((track, index) => (
+                  {selectedAlbum.tracks.map((track, index) => {
+                    const isActiveTrack = currentTrack?.id === track.id;
+                    const isActiveAndPlaying = isActiveTrack && isPlaying;
+
+                    return (
                     <tr
                       key={track.id}
-                      onClick={() => playTrack(track)}
+                      onClick={() => {
+                        if (isActiveAndPlaying) {
+                          audioRef.current?.pause();
+                        } else if (isActiveTrack) {
+                          audioRef.current?.play().catch(console.error);
+                        } else {
+                          playTrack(track);
+                        }
+                      }}
                       className={`group cursor-pointer hover:bg-white/5 ${
-                        currentTrack?.id === track.id ? 'bg-white/10' : ''
+                        isActiveTrack ? 'bg-white/10' : ''
                       }`}
                     >
                       <td className="py-3 text-zinc-400 group-hover:text-white">
-                        <span className="group-hover:hidden">{index + 1}</span>
-                        <Play className="w-4 h-4 hidden group-hover:block fill-current" />
+                        {isActiveAndPlaying ? (
+                          <>
+                            <Pause className="w-4 h-4 fill-current text-[#00F0FF] group-hover:hidden" />
+                            <Pause className="w-4 h-4 fill-current hidden group-hover:block" />
+                          </>
+                        ) : isActiveTrack ? (
+                          <>
+                            <Play className="w-4 h-4 fill-current text-[#00F0FF] group-hover:hidden" />
+                            <Play className="w-4 h-4 fill-current hidden group-hover:block" />
+                          </>
+                        ) : (
+                          <>
+                            <span className="group-hover:hidden">{index + 1}</span>
+                            <Play className="w-4 h-4 hidden group-hover:block fill-current" />
+                          </>
+                        )}
                       </td>
                       <td className="py-3">
-                        <p className={`font-medium ${currentTrack?.id === track.id ? 'text-green-500' : 'text-white'}`}>
+                        <p className={`font-medium ${currentTrack?.id === track.id ? 'text-[#00F0FF]' : 'text-white'}`}>
                           {track.title}
                         </p>
                         <p className="text-zinc-400 text-sm">{track.artist}</p>
@@ -411,14 +511,15 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
                           <Heart
                             className={`w-4 h-4 ${
                               likedTracks.has(track.id)
-                                ? 'fill-green-500 text-green-500'
+                                ? 'fill-[#D4AF37] text-[#D4AF37]'
                                 : 'text-zinc-400 hover:text-white'
                             }`}
                           />
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -460,7 +561,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
           <div className="flex items-center gap-4 mb-2">
             <button
               onClick={() => setShuffle(!shuffle)}
-              className={`transition-colors ${shuffle ? 'text-green-500' : 'text-zinc-400 hover:text-white'}`}
+              className={`transition-colors ${shuffle ? 'text-[#00F0FF]' : 'text-zinc-400 hover:text-white'}`}
             >
               <Shuffle className="w-4 h-4" />
             </button>
@@ -488,11 +589,11 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
             </button>
             <button
               onClick={() => setRepeat(repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off')}
-              className={`transition-colors ${repeat !== 'off' ? 'text-green-500' : 'text-zinc-400 hover:text-white'}`}
+              className={`relative transition-colors ${repeat !== 'off' ? 'text-[#00F0FF]' : 'text-zinc-400 hover:text-white'}`}
             >
               <Repeat className="w-4 h-4" />
               {repeat === 'one' && (
-                <span className="absolute text-[8px] font-bold">1</span>
+                <span className="absolute -top-1 -right-1 text-[8px] font-bold leading-none">1</span>
               )}
             </button>
           </div>
@@ -506,7 +607,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
               max={duration || 0}
               value={currentTime}
               onChange={handleSeek}
-              className="flex-1 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-green-500"
+              className="flex-1 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-[#00F0FF]"
             />
             <span className="text-zinc-400 text-xs w-10">{formatTime(duration)}</span>
           </div>
@@ -530,7 +631,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
               setVolume(parseFloat(e.target.value));
               setIsMuted(false);
             }}
-            className="w-24 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-green-500"
+            className="w-24 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-[#00F0FF]"
           />
         </div>
       </div>

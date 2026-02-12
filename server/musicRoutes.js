@@ -5,8 +5,23 @@ import path from 'path';
 const MUSIC_RUNTIME_DIR = process.env.MUSIC_RUNTIME_DIR || '/var/lib/tecai/music';
 const MUSIC_METADATA_PATH = path.join(MUSIC_RUNTIME_DIR, 'music-metadata.json');
 const COVERS_DIR = path.join(MUSIC_RUNTIME_DIR, 'covers');
-const AUDIO_CACHE_DIR = path.join(MUSIC_RUNTIME_DIR, 'audio-cache');
 const DEFAULT_CHANNEL_USERNAME = 'neyrozvuki';
+
+const AUDIO_MIME_MAP = {
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.opus': 'audio/opus',
+  '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac',
+  '.wav': 'audio/wav',
+  '.aac': 'audio/aac',
+};
+
+const guessAudioMime = (filePath) => {
+  const ext = path.extname(filePath || '').toLowerCase();
+  return AUDIO_MIME_MAP[ext] || 'audio/mpeg';
+};
 
 const musicSyncLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -27,7 +42,6 @@ const coverLimiter = rateLimit({
 const ensureDirs = async () => {
   await fs.mkdir(MUSIC_RUNTIME_DIR, { recursive: true });
   await fs.mkdir(COVERS_DIR, { recursive: true });
-  await fs.mkdir(AUDIO_CACHE_DIR, { recursive: true });
 };
 
 const defaultMetadata = () => ({
@@ -62,9 +76,39 @@ const writeMetadata = async (metadata) => {
 };
 
 const createAlbumId = (albumTitle) => `album_${Buffer.from(albumTitle).toString('base64url').slice(0, 18)}`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const extractCoverOutputUrl = (taskData) => {
+  const directUrl =
+    taskData?.output?.url ||
+    taskData?.output?.image_url ||
+    taskData?.result?.url ||
+    taskData?.result?.image_url;
+  if (directUrl) return directUrl;
+
+  if (!taskData?.resultJson || typeof taskData.resultJson !== 'string') return null;
+  try {
+    const parsed = JSON.parse(taskData.resultJson);
+    return (
+      parsed?.output?.url ||
+      parsed?.output?.image_url ||
+      parsed?.result?.url ||
+      parsed?.result?.image_url ||
+      parsed?.resultUrls?.[0] ||
+      null
+    );
+  } catch {
+    return null;
+  }
+};
+
+const stripAudioExtension = (name) =>
+  name.replace(/\.(mp3|ogg|oga|opus|m4a|flac|wav|aac)$/i, '');
 
 const parseTrackAndAlbum = (audio) => {
-  const rawTitle = (audio.title || audio.file_name || 'Unknown Track').trim();
+  const rawTitle = stripAudioExtension(
+    (audio.title || audio.file_name || 'Unknown Track').trim(),
+  );
   const performer = (audio.performer || 'AI Generated').trim();
 
   if (rawTitle.includes(' - ')) {
@@ -86,15 +130,24 @@ const parseTrackAndAlbum = (audio) => {
 };
 
 const shouldIncludePost = (post, channelUsername) => {
-  if (!post || !post.audio || !post.chat) return false;
+  if (!post || !post.chat) return false;
   if (post.chat.type !== 'channel') return false;
   const username = (post.chat.username || '').toLowerCase();
   return username === (channelUsername || '').toLowerCase();
 };
 
 const startCoverJob = async (album, metadata, kieApiKey) => {
-  if (!kieApiKey || album.coverUrl || metadata.coverJobs?.[album.id]?.status === 'processing') {
-    return;
+  if (album.coverUrl || metadata.coverJobs?.[album.id]?.status === 'processing') {
+    return false;
+  }
+
+  if (!kieApiKey) {
+    metadata.coverJobs[album.id] = {
+      status: 'error',
+      updatedAt: new Date().toISOString(),
+      reason: 'missing_kie_api_key',
+    };
+    return false;
   }
 
   const coverPrompt = `Abstract album cover for "${album.title}" electronic neuro music, premium design, vibrant and cinematic`;
@@ -113,14 +166,31 @@ const startCoverJob = async (album, metadata, kieApiKey) => {
     }),
   });
 
+  if (!response.ok) {
+    metadata.coverJobs[album.id] = {
+      status: 'error',
+      updatedAt: new Date().toISOString(),
+      reason: `kie_http_${response.status}`,
+    };
+    return false;
+  }
+
   const result = await response.json();
-  if (result?.code === 0 && result?.data?.taskId) {
+  if (result?.data?.taskId) {
     metadata.coverJobs[album.id] = {
       taskId: result.data.taskId,
       status: 'processing',
       updatedAt: new Date().toISOString(),
     };
+    return true;
   }
+
+  metadata.coverJobs[album.id] = {
+    status: 'error',
+    updatedAt: new Date().toISOString(),
+    reason: result?.msg || 'kie_create_task_failed',
+  };
+  return false;
 };
 
 const resolveCoverJobs = async (metadata, kieApiKey) => {
@@ -138,16 +208,21 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
       });
       const result = await response.json();
 
-      if (result?.code !== 0 || !result?.data) {
+      if (!result?.data) {
         continue;
       }
 
-      if (result.data.status === 'PROCESSING') {
+      const taskData = result.data;
+      const taskState = String(taskData.status || taskData.state || '')
+        .trim()
+        .toUpperCase();
+
+      if (['PROCESSING', 'WAITING', 'PENDING', 'RUNNING'].includes(taskState)) {
         continue;
       }
 
-      if (result.data.status === 'SUCCESS') {
-        const outputUrl = result.data?.output?.url || result.data?.output?.image_url;
+      if (['SUCCESS', 'COMPLETED', 'DONE'].includes(taskState)) {
+        const outputUrl = extractCoverOutputUrl(taskData);
         if (!outputUrl) {
           metadata.coverJobs[albumId] = {
             ...job,
@@ -191,7 +266,7 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
           ...job,
           status: 'error',
           updatedAt: new Date().toISOString(),
-          reason: result.data.status || 'unknown',
+          reason: taskData.failMsg || taskState || 'unknown',
         };
       }
     } catch (error) {
@@ -202,6 +277,20 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
         reason: error?.message || 'unexpected_error',
       };
     }
+  }
+};
+
+const resolveCoverJobsWithRetries = async (metadata, kieApiKey, retries = 4, delayMs = 2000) => {
+  if (!kieApiKey) return;
+  for (let i = 0; i < retries; i += 1) {
+    await resolveCoverJobs(metadata, kieApiKey);
+    const hasProcessing = Object.values(metadata.coverJobs || {}).some(
+      (job) => job?.status === 'processing',
+    );
+    if (!hasProcessing) {
+      return;
+    }
+    await sleep(delayMs);
   }
 };
 
@@ -231,7 +320,7 @@ export const setupMusicRoutes = (app) => {
   });
 
   app.post('/api/music/sync', musicSyncLimiter, async (req, res) => {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = process.env.TELEGRAM_MUSIC_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     const kieApiKey = process.env.KIE_AI_API_KEY;
 
     if (!token) {
@@ -254,7 +343,6 @@ export const setupMusicRoutes = (app) => {
       let offset = Number(metadata.lastUpdateId || 0) + 1;
       let keepFetching = true;
       let loopGuard = 0;
-      const newAlbumIds = new Set();
 
       while (keepFetching && loopGuard < 20) {
         loopGuard += 1;
@@ -283,7 +371,21 @@ export const setupMusicRoutes = (app) => {
             continue;
           }
 
-          const audio = post.audio;
+          const audioPayload = post.audio
+            ? { audio: post.audio, messageId: post.message_id, timestamp: post.date }
+            : post.pinned_message?.audio
+              ? {
+                  audio: post.pinned_message.audio,
+                  messageId: post.pinned_message.message_id || post.message_id,
+                  timestamp: post.pinned_message.date || post.date,
+                }
+              : null;
+
+          if (!audioPayload) {
+            continue;
+          }
+
+          const { audio, messageId, timestamp } = audioPayload;
           const uniqueId = audio.file_unique_id;
           if (!uniqueId || seenUniqueIds.has(uniqueId)) {
             continue;
@@ -302,7 +404,6 @@ export const setupMusicRoutes = (app) => {
               tracks: [],
               createdAt: new Date(post.date * 1000).toISOString(),
             });
-            newAlbumIds.add(albumId);
           }
 
           const album = albumsById.get(albumId);
@@ -315,8 +416,8 @@ export const setupMusicRoutes = (app) => {
             audioUrl: `/api/music/file/${audio.file_id}`,
             telegramFileId: audio.file_id,
             fileUniqueId: uniqueId,
-            telegramPostId: post.message_id,
-            createdAt: new Date(post.date * 1000).toISOString(),
+            telegramPostId: messageId,
+            createdAt: new Date(timestamp * 1000).toISOString(),
           };
 
           album.tracks.unshift(track);
@@ -325,6 +426,52 @@ export const setupMusicRoutes = (app) => {
         }
 
         keepFetching = updates.length === 100;
+      }
+
+      // Fallback: also ingest pinned message audio from channel chat state,
+      // because it may exist without a fresh channel_post update event.
+      try {
+        const channelChatResponse = await fetch(
+          `https://api.telegram.org/bot${token}/getChat?chat_id=@${encodeURIComponent(channelUsername)}`,
+        );
+        const channelChatData = await channelChatResponse.json();
+        const pinned = channelChatData?.result?.pinned_message;
+        const pinnedAudio = pinned?.audio;
+
+        if (pinnedAudio?.file_unique_id && !seenUniqueIds.has(pinnedAudio.file_unique_id)) {
+          const parsed = parseTrackAndAlbum(pinnedAudio);
+          const albumId = createAlbumId(parsed.albumTitle);
+          if (!albumsById.has(albumId)) {
+            albumsById.set(albumId, {
+              id: albumId,
+              title: parsed.albumTitle,
+              artist: parsed.artist,
+              coverUrl: null,
+              coverGenerated: false,
+              trackCount: 0,
+              tracks: [],
+              createdAt: new Date((pinned?.date || Date.now() / 1000) * 1000).toISOString(),
+            });
+          }
+
+          const album = albumsById.get(albumId);
+          album.tracks.unshift({
+            id: `track_${pinnedAudio.file_unique_id}`,
+            title: parsed.trackTitle,
+            artist: parsed.artist,
+            albumId,
+            duration: pinnedAudio.duration || 180,
+            audioUrl: `/api/music/file/${pinnedAudio.file_id}`,
+            telegramFileId: pinnedAudio.file_id,
+            fileUniqueId: pinnedAudio.file_unique_id,
+            telegramPostId: pinned?.message_id || 0,
+            createdAt: new Date((pinned?.date || Date.now() / 1000) * 1000).toISOString(),
+          });
+          album.trackCount = album.tracks.length;
+          seenUniqueIds.add(pinnedAudio.file_unique_id);
+        }
+      } catch (pinnedError) {
+        // Non-fatal fallback path
       }
 
       metadata.albums = Array.from(albumsById.values())
@@ -339,14 +486,14 @@ export const setupMusicRoutes = (app) => {
 
       metadata.totalTracks = metadata.albums.reduce((acc, album) => acc + album.tracks.length, 0);
 
-      for (const albumId of newAlbumIds) {
-        const album = metadata.albums.find((item) => item.id === albumId);
-        if (album) {
+      // Start cover generation for any album that still has no cover.
+      for (const album of metadata.albums) {
+        if (!album.coverUrl) {
           await startCoverJob(album, metadata, kieApiKey);
         }
       }
 
-      await resolveCoverJobs(metadata, kieApiKey);
+      await resolveCoverJobsWithRetries(metadata, kieApiKey);
 
       metadata.lastSync = new Date().toISOString();
       metadata.syncStatus = 'success';
@@ -364,7 +511,7 @@ export const setupMusicRoutes = (app) => {
   app.get('/api/music/file/:fileId', async (req, res) => {
     try {
       const { fileId } = req.params;
-      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const token = process.env.TELEGRAM_MUSIC_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
       if (!token) {
         return res.status(500).json({ error: 'Telegram bot token not configured' });
       }
@@ -383,11 +530,20 @@ export const setupMusicRoutes = (app) => {
         return res.status(fileResponse.status || 502).json({ error: 'Failed to fetch file' });
       }
 
-      const contentType = fileResponse.headers.get('content-type') || 'application/octet-stream';
+      const telegramContentType = fileResponse.headers.get('content-type') || '';
+      const contentType =
+        telegramContentType.startsWith('audio/')
+          ? telegramContentType
+          : guessAudioMime(filePathData.result.file_path);
       const contentLength = fileResponse.headers.get('content-length');
+      // Override helmet's restrictive headers for media streaming
+      res.removeHeader('Content-Security-Policy');
+      res.removeHeader('Cross-Origin-Resource-Policy');
+      res.removeHeader('Cross-Origin-Opener-Policy');
       res.setHeader('Content-Type', contentType);
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
       if (contentLength) {
         res.setHeader('Content-Length', contentLength);
       }
@@ -409,8 +565,11 @@ export const setupMusicRoutes = (app) => {
       const filename = path.basename(req.params.filename);
       const filepath = path.join(COVERS_DIR, filename);
       const file = await fs.readFile(filepath);
+      res.removeHeader('Content-Security-Policy');
+      res.removeHeader('Cross-Origin-Resource-Policy');
       res.setHeader('Content-Type', 'image/webp');
       res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
       res.send(file);
     } catch {
       res.status(404).json({ error: 'Cover not found' });

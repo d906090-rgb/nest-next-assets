@@ -103,7 +103,8 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
     res.json({ content: response.choices[0].message.content });
   } catch (error) {
     console.error('OpenAI Error:', error);
-    res.status(error.status || 500).json({ error: error.message || 'Internal Server Error' });
+    const statusCode = typeof error?.status === 'number' ? error.status : 500;
+    res.status(statusCode).json({ error: 'AI service temporarily unavailable' });
   }
 });
 

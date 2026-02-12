@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YANDEX BIBLE 2026: TOTAL DOMINATION</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #000;
+    }
+    .slide {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 4rem 3rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-bottom: 10px solid #000;
+    }
+    h1 { font-size: 4rem; font-weight: 900; text-transform: uppercase; line-height: 1; margin: 0 0 1rem; letter-spacing: -2px; }
+    h2 { font-size: 2.5rem; font-weight: 900; text-transform: uppercase; margin: 0 0 2rem; border-left: 15px solid #fc0; padding-left: 1.5rem; }
+    h3 { font-size: 1.8rem; font-weight: 800; margin: 1.5rem 0 1rem; text-transform: uppercase; }
+    
+    .section-header {
+      background: #000; color: #fff; padding: 1.5rem 3rem; font-size: 2.5rem; font-weight: 800; text-transform: uppercase; margin-bottom: 3rem; letter-spacing: 2px;
+    }
+    .section-header.gray { background: #333; border-left: 30px solid #ff0000; }
+    .section-header.white { background: #006400; border-left: 30px solid #00ff00; }
+    .section-header.tech { background: #00008b; border-left: 30px solid #00bfff; }
+    .section-header.geo { background: #663399; border-left: 30px solid #9370db; }
+
+    p { margin-bottom: 1rem; font-size: 1.15rem; max-width: 100%; }
+    
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; width: 100%; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; width: 100%; }
+    
+    .card { 
+      border: 3px solid #000; 
+      padding: 2rem; 
+      background: #f8f8f8; 
+      height: 100%;
+    }
+    .card:hover { box-shadow: 10px 10px 0 rgba(0,0,0,0.2); transform: translateY(-3px); transition: 0.2s; }
+    
+    .gray-card { background: #f0f0f0; border-color: #333; }
+    .gray-card strong { background: #333; color: #fff; }
+    
+    .white-card { background: #e6ffe6; border-color: #006400; }
+    .white-card strong { background: #006400; color: #fff; }
+
+    .tech-card { background: #e6f7ff; border-color: #00008b; }
+    .tech-card strong { background: #00008b; color: #fff; }
+
+    .geo-card { background: #f3e6ff; border-color: #663399; }
+    .geo-card strong { background: #663399; color: #fff; }
+    
+    .card strong { display: block; font-size: 1.4rem; margin-bottom: 1rem; text-transform: uppercase; padding: 0.5rem 1rem; display: inline-block; }
+    .card ul { margin: 0; padding-left: 1.2rem; }
+    .card li { margin-bottom: 0.8rem; font-size: 1.1rem; }
+    
+    .warning { background: #000; color: #fc0; padding: 1.5rem; font-weight: bold; font-size: 1.2rem; margin-top: 2rem; border: 5px solid #fc0; text-transform: uppercase; }
+    .pro-tip { border: 4px dashed #000; padding: 2rem; background: #fffbe6; margin-top: 2rem; position: relative; }
+    .pro-tip::before { content: "PRO SECRET"; position: absolute; top: -20px; left: 20px; background: #fc0; color: #000; padding: 5px 15px; font-weight: bold; font-size: 1.2rem; border: 2px solid #000; }
+
+    nav {
+      position: fixed; bottom: 1rem; right: 1rem; background: #000; padding: 1rem; z-index: 100;
+      display: flex; flex-direction: column; gap: 5px; max-width: 250px; border: 2px solid #fc0; max-height: 80vh; overflow-y: auto;
+    }
+    nav a { color: #fff; text-decoration: none; font-size: 12px; padding: 5px 10px; text-transform: uppercase; font-weight: bold; }
+    nav a:hover { background: #fc0; color: #000; }
+    nav .divider { height: 1px; background: #555; margin: 5px 0; }
+  </style>
+</head>
+<body>
+
+  <section class="slide" id="intro">
+    <h1>YANDEX BIBLE 2026</h1>
+    <p style="font-size: 2.5rem; font-weight: 800; color: #000;">ЭНЦИКЛОПЕДИЯ ПРОДВИЖЕНИЯ</p>
+    <div class="grid-2">
+      <div>
+        <h3 style="color: #006400;">БЕЛОЕ SEO</h3>
+        <ul>
+          <li>YATI и Нейросети</li>
+          <li>Коммерческие факторы (E-com)</li>
+          <li>Бренд и Траст</li>
+          <li>GEO (AI) Оптимизация</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color: #ff0000;">СЕРОЕ SEO</h3>
+        <ul>
+          <li>Накрутка ПФ (Hardcore)</li>
+          <li>Монобренд и Сетки</li>
+          <li>Дроп-домены</li>
+          <li>Гео-спам</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ИСТОРИЯ И ЭВОЛЮЦИЯ -->
+  <section class="slide" id="evolution">
+    <h2>1. ЭВОЛЮЦИЯ АЛГОРИТМОВ (ПОЧЕМУ ОНО ТАК РАБОТАЕТ)</h2>
+    <div class="grid">
+      <div class="card tech-card">
+        <strong>2009-2015: MATRIXNET</strong>
+        <p>Начало машинного обучения. Формула ранжирования стала строиться не вручную, а алгоритмом. </p>
+        <p><em>Суть:</em> Яндекс впервые научился учитывать тысячи факторов (ссылки, тексты, регион) одновременно.</p>
+      </div>
+      <div class="card tech-card">
+        <strong>2016-2017: ПАЛЕХ & КОРОЛЕВ</strong>
+        <p>Внедрение нейросетей. "Палех" анализировал заголовки, "Королев" — весь текст страницы.</p>
+        <p><em>Суть:</em> Поиск начал понимать смысл запроса, а не просто наличие слов. Рождение семантического поиска.</p>
+      </div>
+      <div class="card tech-card">
+        <strong>2020: YATI (ПРОРЫВ)</strong>
+        <p>Yet Another Transformer with Improvements. Тяжелая нейросеть (аналог BERT), которая видит связь между словами.</p>
+        <p><em>Суть:</em> Тексты "для роботов" (набор ключей) умерли. Текст должен быть экспертным и логичным.</p>
+      </div>
+    </div>
+    <div class="pro-tip">
+      <strong>ВЫВОД:</strong> В 2026 году вы пишете не для робота (ключи), а для нейросети (смыслы). Она умнее вас. Обмануть ее "тошнотой" слов нельзя, только полнотой темы.
+    </div>
+  </section>
+
+  <!-- МЕХАНИКА РАНЖИРОВАНИЯ (НОВЫЙ БЛОК) -->
+  <section class="slide" id="ranking-mechanics">
+    <div class="section-header tech">МЕХАНИКА АЛГОРИТМОВ</div>
+    <h2>2. КАК РАБОТАЕТ ПОИСК (L1, L2, L3)</h2>
+    <p>Поиск происходит в три этапа. Важно понимать, на каком этапе вы отсеиваетесь.</p>
+    <div class="grid">
+      <div class="card tech-card">
+        <strong>ЭТАП 1: БАЗОВЫЙ ПОИСК (L1)</strong>
+        <p>Из миллиардов страниц отбирается ~1000 кандидатов.</p>
+        <p><em>Критерии:</em> Легкие формулы (BM25 — наличие слов из запроса, регион, Title). Если у вас нет ключевого слова в Title, вы не пройдете этот фильтр.</p>
+      </div>
+      <div class="card tech-card">
+        <strong>ЭТАП 2: METRIC LEARNING (L2)</strong>
+        <p>1000 кандидатов сортируются тяжелой формулой MatrixNet/CatBoost.</p>
+        <p><em>Критерии:</em> 500+ факторов. Ссылки, возраст домена, коммерческие маркеры, история ПФ. Здесь отсеиваются ГС (говносайты) и дорвеи.</p>
+      </div>
+      <div class="card tech-card">
+        <strong>ЭТАП 3: НЕЙРОСЕТЬ (L3)</strong>
+        <p>ТОП-30 лучших переранжирует YATI.</p>
+        <p><em>Критерии:</em> Глубокий смысл текста. Нейросеть "читает" статью и решает, кто экспертнее. Именно поэтому хороший текст может побить старый трастовый сайт в ТОП-3.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="ranking-factors">
+    <h2>3. ФОРМУЛА РАНЖИРОВАНИЯ 2026</h2>
+    <p>Что влияет на позицию (веса факторов).</p>
+    <div class="grid-2">
+      <div class="card tech-card">
+        <strong>CATBOOST (МАШИННОЕ ОБУЧЕНИЕ)</strong>
+        <p>Алгоритм градиентного бустинга на деревьях решений. Он строит тысячи правил вида: <em>"Если сайт старый И есть телефон И хороший ПФ -> ТОП-5"</em>.</p>
+        <p>Нельзя "накрутить" один фактор (например, ссылки) и выйти в топ. Нужно подтянуть всё до среднего уровня по нише.</p>
+      </div>
+      <div class="card tech-card">
+        <strong>ВЕСА ФАКТОРОВ (ПРИБЛИЗИТЕЛЬНО)</strong>
+        <ul>
+          <li><strong>Поведенческие (ПФ):</strong> ~40-50% (Главный драйвер).</li>
+          <li><strong>Текстовые (YATI):</strong> ~30% (Релевантность).</li>
+          <li><strong>Коммерческие/Хостовые:</strong> ~15% (Траст, возраст, регион).</li>
+          <li><strong>Ссылки:</strong> ~5% (Минимум, только для индексации).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- GEO / AI (НОВЫЙ БЛОК) -->
+  <section class="slide" id="geo-ai">
+    <div class="section-header geo">GEO & YANDEX NEURO</div>
+    <h2>4. ЯНДЕКС.НЕЙРО И GEO-ОПТИМИЗАЦИЯ</h2>
+    <p>Новый поиск 2026. Пользователь получает готовый ответ, собранный нейросетью из 3-5 источников.</p>
+    <div class="grid">
+      <div class="card geo-card">
+        <strong>КАК РАБОТАЕТ НЕЙРО</strong>
+        <p>Яндекс.Нейро не сканирует интернет в реальном времени. Он берет <strong>ТОП-10</strong> органической выдачи, читает эти сайты и саммаризирует ответ.</p>
+        <p><em>Вывод:</em> Чтобы попасть в ответ нейросети (и получить ссылку-источник), вы ОБЯЗАНЫ быть в органическом ТОП-10.</p>
+      </div>
+      <div class="card geo-card">
+        <strong>ОПТИМИЗАЦИЯ ПОД НЕЙРО (GEO)</strong>
+        <ul>
+          <li><strong>Структура "Вопрос-Ответ":</strong> Нейросети легче взять готовый абзац. Заголовок H2 (Вопрос) -> Текст 300 знаков (Ответ).</li>
+          <li><strong>Факты и Цифры:</strong> Нейросеть любит точность ("Температура 100°C", а не "Горячо").</li>
+          <li><strong>Списки:</strong> Маркированные списки почти всегда попадают в ответ.</li>
+        </ul>
+      </div>
+      <div class="card geo-card">
+        <strong>АЛИСА (ГОЛОСОВОЙ ПОИСК)</strong>
+        <p>Алиса часто зачитывает "Быстрый ответ" (Featured Snippet).</p>
+        <ul>
+          <li>Разметка <code>Schema.org/Speakable</code> (экспериментально).</li>
+          <li>Короткие предложения. Простой синтаксис.</li>
+          <li>Отсутствие воды.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- НОВЫЙ СЛАЙД: СМИ И ПУБЛИКАЦИИ -->
+  <section class="slide" id="media-stacking">
+    <h2>5. ENTITY STACKING: ПРОКАЧКА АВТОРА И СМИ</h2>
+    <p>Как доказать Яндексу, что вы эксперт? О вас должны писать авторитетные источники (СМИ). Это дает "цифровой след".</p>
+    <div class="grid">
+      <div class="card white-card">
+        <strong>БЕСПЛАТНЫЙ ТРАСТ (ПЛОЩАДКИ)</strong>
+        <p>Публикуйте экспертные статьи здесь (Яндекс их обожает):</p>
+        <ul>
+          <li><strong>VC.ru / Habr.com:</strong> Статьи индексируются мгновенно. Дают мощный вес.</li>
+          <li><strong>Dzen.ru:</strong> Работает внутри экосистемы Яндекса.</li>
+          <li><strong>Pikabu:</strong> Дает "живой" трафик и ПФ.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>ПАКЕТНОЕ РАЗМЕЩЕНИЕ (БИРЖИ)</strong>
+        <p>Если нет времени писать, купите размещения:</p>
+        <ul>
+          <li><strong>Miralinks:</strong> Самая большая биржа статей. Можно купить размещение на РБК, Forbes, региональных СМИ. Это формирует ссылочный профиль бренда.</li>
+          <li><strong>Pressfeed:</strong> Сервис запросов журналистов. Отвечайте экспертно — попадайте в СМИ бесплатно.</li>
+          <li><strong>Collaborator:</strong> Прямая покупка гостевых постов на блогах.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>СТРАТЕГИЯ</strong>
+        <p>Закажите 10 статей на разных ресурсах с упоминанием ФИО эксперта и названием бренда. Через месяц Яндекс склеит эти упоминания в одну "Сущность" (Entity) и повысит траст вашего основного сайта.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- БЕЛАЯ ЧАСТЬ: КОММЕРЦИЯ -->
+  <section class="slide" id="commercial-general">
+    <div class="section-header white">БЕЛЫЙ ФУНДАМЕНТ: E-COMMERCE</div>
+    <h2>6. КОММЕРЧЕСКИЕ ФАКТОРЫ (ОБЩИЕ)</h2>
+    <p>Яндекс оценивает надежность бизнеса. Если сайт выглядит как "однодневка", он не попадет в топ.</p>
+    <div class="grid">
+      <div class="card white-card">
+        <strong>КОНТАКТЫ (TRUST)</strong>
+        <ul>
+          <li><strong>Телефон:</strong> 8-800 или городской (495). Мобильный — минус.</li>
+          <li><strong>Адрес:</strong> Реальный, с виджетом Яндекс.Карт.</li>
+          <li><strong>Реквизиты:</strong> ИНН, ОГРН в футере или разделе "О нас".</li>
+          <li><strong>Мессенджеры:</strong> WhatsApp/Telegram (кликебельные иконки).</li>
+          <li><strong>Email:</strong> На домене (@site.ru), а не @gmail.com.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>СЕРВИС</strong>
+        <ul>
+          <li><strong>Доставка:</strong> Страница с картой зон, сроками и ценами (таблица).</li>
+          <li><strong>Оплата:</strong> Логотипы Visa/Mastercard/Mir. Описание процесса возврата.</li>
+          <li><strong>Гарантия:</strong> Отдельная страница с условиями и сканами сертификатов.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>КОМПАНИЯ</strong>
+        <ul>
+          <li><strong>О нас:</strong> Фото офиса, склада, команды. Видео с производства.</li>
+          <li><strong>Новости:</strong> Блог должен быть живым (последняя новость не старше месяца).</li>
+          <li><strong>Вакансии:</strong> Раздел "Работа" — мощный сигнал реальности бизнеса.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="commercial-listing">
+    <h2>7. КОММЕРЧЕСКИЕ ФАКТОРЫ: ЛИСТИНГ (КАТАЛОГ)</h2>
+    <p>Страница категории — главная точка входа в интернет-магазине. Она должна быть удобной.</p>
+    <div class="grid-2">
+      <div class="card white-card">
+        <strong>МАТРИЦА АССОРТИМЕНТА</strong>
+        <p>Правило: <em>"Кто больше, тот и выше"</em>.</p>
+        <ul>
+          <li>Если у конкурента 1000 товаров, а у вас 100 — вы проиграете.</li>
+          <li><strong>Лайфхак:</strong> Клонируйте товары. 10 цветов платья = 10 карточек, а не одна с выбором цвета.</li>
+          <li><strong>Лайфхак:</strong> Не удаляйте товары "нет в наличии". Ставьте статус "Под заказ". Пустые категории вылетают из индекса.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>ФУНКЦИОНАЛ</strong>
+        <ul>
+          <li><strong>Фильтры:</strong> По цене, бренду, характеристикам (чем больше, тем лучше).</li>
+          <li><strong>Сортировка:</strong> По цене, популярности, новизне.</li>
+          <li><strong>Кнопки:</strong> "Купить" или "В корзину" прямо в листинге.</li>
+          <li><strong>Сравнение/Избранное:</strong> Добавьте иконки, даже если ими редко пользуются. Это сигнал качества.</li>
+          <li><strong>Количество на странице:</strong> Делайте пагинацию (по 20-30 товаров) или "Показать еще".</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="commercial-card">
+    <h2>8. КОММЕРЧЕСКИЕ ФАКТОРЫ: КАРТОЧКА ТОВАРА</h2>
+    <p>Если пользователь зашел в карточку, он должен купить. Яндекс замеряет конверсию через поведение.</p>
+    <div class="grid">
+      <div class="card white-card">
+        <strong>ЦЕНА И КНОПКА</strong>
+        <ul>
+          <li><strong>Цена:</strong> Крупно, заметно. Старая цена (зачеркнутая) повышает CTR.</li>
+          <li><strong>Кнопка:</strong> Яркая, контрастная. Текст "В корзину" или "Купить".</li>
+          <li><strong>Купить в 1 клик:</strong> Обязательно для ленивых.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>ИНФОРМАЦИЯ</strong>
+        <ul>
+          <li><strong>Характеристики:</strong> Подробная таблица.</li>
+          <li><strong>Описание:</strong> Уникальный текст (не копипаст от поставщика!).</li>
+          <li><strong>Фото:</strong> Галерея, зум, 360-обзор.</li>
+          <li><strong>Наличие:</strong> "В наличии на складе" или "Много".</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>СОЦИАЛЬНЫЕ ДОКАЗАТЕЛЬСТВА</strong>
+        <ul>
+          <li><strong>Отзывы:</strong> Блок с реальными отзывами (можно мотивировать скидкой).</li>
+          <li><strong>Рейтинг:</strong> Звездочки (Schema.org AggregateRating).</li>
+          <li><strong>Доставка:</strong> Блок "Доставим завтра за 300 руб" прямо в карточке.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- БЕЛАЯ ЧАСТЬ: КОНТЕНТ -->
+  <section class="slide" id="yati-deep">
+    <div class="section-header white">БЕЛЫЙ ФУНДАМЕНТ: YATI & LSI</div>
+    <h2>9. LSI-КОПИРАЙТИНГ (КАК ПИСАТЬ)</h2>
+    <p>Забудьте про "вхождения". Пишите "облаком смыслов".</p>
+    <div class="grid">
+      <div class="card white-card">
+        <strong>ШИРИНА ТЕМЫ (TOPIC WIDTH)</strong>
+        <p>Яндекс оценивает, насколько полно раскрыт интент.</p>
+        <p><em>Пример:</em> Статья "Ремонт ванной".</p>
+        <ul>
+          <li><strong>Плохо:</strong> Просто текст "делаем ремонт недорого".</li>
+          <li><strong>Хорошо:</strong> Блоки про плитку, сантехнику, гидроизоляцию, реечный потолок, разводку труб, стоимость работ.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>LSI-ЯДРО (СЛОВАРЬ)</strong>
+        <p>Соберите слова, которые есть у всех конкурентов в ТОП-10.</p>
+        <p><em>Инструменты:</em> Arsenkin (Парсинг подсветки), Just-Magic.</p>
+        <p>Если конкуренты пишут "стяжка", "наливной пол", "маяки" — эти слова ОБЯЗАНЫ быть у вас.</p>
+      </div>
+      <div class="card white-card">
+        <strong>ЭКСПЕРТНОСТЬ</strong>
+        <p>YATI отличает воду от фактов.</p>
+        <ul>
+          <li><strong>Цифры:</strong> "Сохнет 24 часа" (а не "быстро").</li>
+          <li><strong>Термины:</strong> "Адгезия" (а не "липкость").</li>
+          <li><strong>Точность:</strong> "ГОСТ 123-45".</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="structure">
+    <h2>10. СТРУКТУРА КОНТЕНТА (UX)</h2>
+    <p>Текст должен быть сканируемым. "Простыни" текста не читают ни люди, ни роботы.</p>
+    <div class="grid-2">
+      <div class="card white-card">
+        <strong>ВЕРСТКА</strong>
+        <ul>
+          <li><strong>Заголовки:</strong> H1 (один), H2 (разделы), H3 (подразделы). Четкая иерархия.</li>
+          <li><strong>Списки:</strong> Маркированные и нумерованные. В каждом экране должен быть список.</li>
+          <li><strong>Таблицы:</strong> Яндекс их обожает. Сравнивайте цены, характеристики, плюсы/минусы.</li>
+          <li><strong>Цитаты:</strong> Выделяйте важное в блоки <code>blockquote</code>.</li>
+        </ul>
+      </div>
+      <div class="card white-card">
+        <strong>МУЛЬТИМЕДИА</strong>
+        <ul>
+          <li><strong>Картинки:</strong> Каждые 1-2 экрана. Обязательно Alt и Title.</li>
+          <li><strong>Видео:</strong> Эмбед с YouTube/RuTube/VK Video. Увеличивает время на сайте (Dwell Time).</li>
+          <li><strong>Оглавление:</strong> Ссылки-якоря в начале статьи. Помогают навигации и формируют быстрые ссылки в сниппете.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- СЕРАЯ ЧАСТЬ: ПФ -->
+  <section class="slide" id="pf-theory">
+    <div class="section-header gray">СЕРАЯ СХЕМА: HARDCORE</div>
+    <h2>11. ПОВЕДЕНЧЕСКИЕ ФАКТОРЫ: ТЕОРИЯ</h2>
+    <p>Почему накрутка работает? Потому что Яндекс верит действиям пользователей больше, чем ссылкам.</p>
+    <div class="grid">
+      <div class="card gray-card">
+        <strong>CTR (КЛИКАБЕЛЬНОСТЬ)</strong>
+        <p>Отношение показов к кликам в выдаче.</p>
+        <p>Если сайт на 9 месте кликают чаще, чем сайт на 3 месте — Яндекс поднимет его.</p>
+      </div>
+      <div class="card gray-card">
+        <strong>DWELL TIME (ВРЕМЯ)</strong>
+        <p>Время, проведенное на сайте.</p>
+        <p>Меньше 15 секунд = "Отказ" (плохо). Больше 60 секунд = "Интересно" (хорошо).</p>
+      </div>
+      <div class="card gray-card">
+        <strong>LAST CLICK (ПОСЛЕДНИЙ КЛИК)</strong>
+        <p>Самый мощный сигнал.</p>
+        <p>Если пользователь зашел на ваш сайт и <strong>закрыл вкладку поиска</strong> (перестал искать) — значит, вы решили его проблему. Вы — ТОП-1.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="pf-practice">
+    <h2>12. НАКРУТКА ПФ: ПРАКТИКА И СОФТ</h2>
+    <p>Как это делают профессионалы. Инструкция "Камикадзе".</p>
+    <div class="grid-2">
+      <div class="card gray-card">
+        <strong>СОФТ (ИНСТРУМЕНТЫ)</strong>
+        <ul>
+          <li><strong>Zennoposter:</strong> Комбайн для автоматизации. Нужны приватные шаблоны ("гулялки"). Публичные шаблоны Яндекс знает и банит.</li>
+          <li><strong>BAS (Browser Automation Studio):</strong> Бесплатный аналог Zenno. Можно написать своего бота.</li>
+          <li><strong>Userator (SEO-пикап):</strong> Биржа, где живые люди (школьники) кликают за деньги. Трафик "грязный", но работает для разбавления.</li>
+          <li><strong>PF-Link / SerpClick:</strong> Облачные сервисы "под ключ". Дорого, но без настройки софта.</li>
+        </ul>
+      </div>
+      <div class="card gray-card">
+        <strong>ПРОКСИ И АНОНИМНОСТЬ</strong>
+        <ul>
+          <li><strong>IPv4/IPv6 Серверные:</strong> ЗАПРЕЩЕНО. Мгновенный бан.</li>
+          <li><strong>Мобильные (LTE/4G):</strong> ОБЯЗАТЕЛЬНО. У них общий IP на тысячи людей (NAT). Яндекс не может забанить мобильный IP.</li>
+          <li><strong>Ротация:</strong> Смена IP каждые 2-5 минут (по ссылке).</li>
+          <li><strong>Fingerprints:</strong> Подмена Canvas, WebGL, Fonts, AudioContext. Бот должен выглядеть как уникальный Chrome/Safari.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="warning">ВАЖНО: КРУТИТЬ НУЖНО ПЛАВНО. РОСТ ТРАФИКА ДОЛЖЕН БЫТЬ +10-20% В НЕДЕЛЮ, А НЕ +1000% ЗА ДЕНЬ.</div>
+  </section>
+
+  <section class="slide" id="monopoly">
+    <h2>13. МОНОБРЕНД (СТРАТЕГИЯ "СПРУТ")</h2>
+    <p>Как занять весь ТОП-10 своими сайтами и вытеснить конкурентов.</p>
+    <div class="grid">
+      <div class="card gray-card">
+        <strong>СУТЬ МЕТОДА</strong>
+        <p>Создаем 5-10 сайтов под одну тематику. Они выглядят по-разному, но принадлежат вам.</p>
+        <p><em>Результат:</em> Клиент выбирает между Вами, Вами и Вами. Весь трафик ниши — ваш.</p>
+      </div>
+      <div class="card gray-card">
+        <strong>ЗАЩИТА ОТ АФФИЛИРОВАНИЯ</strong>
+        <p>Яндекс склеивает клоны. Как избежать:</p>
+        <ul>
+          <li>Разные хостинги (Reg.ru, Beget, Timeweb).</li>
+          <li>Разные CMS (Wordpress, Bitrix, Tilda, OpenCart).</li>
+          <li>Разные контакты (Виртуальные номера, разные адреса офисов).</li>
+          <li>Разные юрлица (или без них).</li>
+          <li>Разная структура каталога и тексты (рерайт).</li>
+        </ul>
+      </div>
+      <div class="card gray-card">
+        <strong>ДРОП-ДОМЕНЫ</strong>
+        <p>Для сетки лучше брать не свежие домены, а дропы (с историей).</p>
+        <ul>
+          <li>Возраст домена — фактор ранжирования.</li>
+          <li>Дроп сразу ранжируется, новорег — через год.</li>
+          <li>Восстанавливаем контент из WebArchive или делаем новый.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ФИЛЬТРЫ -->
+  <section class="slide" id="filters-all">
+    <h2>14. ВСЕ ФИЛЬТРЫ ЯНДЕКСА (СПРАВОЧНИК)</h2>
+    <div class="grid">
+      <div class="card">
+        <strong>МИМИКРИЯ</strong>
+        <p>Бан за копирование дизайна лидеров. Вылет за ТОП-100.</p>
+        <p><em>Лечение:</em> Редизайн, уникализация, письмо в саппорт. Ждать 30 дней.</p>
+      </div>
+      <div class="card">
+        <strong>МПК</strong>
+        <p>Малополезный контент. Спам, реклама, дубли, пустые страницы.</p>
+        <p><em>Лечение:</em> Удалить рекламу, дописать текст, закрыть тех. страницы.</p>
+      </div>
+      <div class="card">
+        <strong>БАДЕН-БАДЕН</strong>
+        <p>Переспам ключами в тексте.</p>
+        <p><em>Лечение:</em> Переписать текст "для людей", убрать "воду" и тавтологию.</p>
+      </div>
+      <div class="card">
+        <strong>МИНУСИНСК</strong>
+        <p>Покупка SEO-ссылок в промышленных масштабах.</p>
+        <p><em>Лечение:</em> Снять все покупные ссылки. Ждать пересчета (долго).</p>
+      </div>
+      <div class="card">
+        <strong>АГС</strong>
+        <p>Сайт создан для продажи ссылок, а не для людей.</p>
+        <p><em>Лечение:</em> Практически невозможно. Проще сменить домен.</p>
+      </div>
+      <div class="card">
+        <strong>АФФИЛИАТ</strong>
+        <p>Склейка двух ваших сайтов.</p>
+        <p><em>Лечение:</em> Разнести сайты по разным хостингам/контактам. Писать "это наши партнеры".</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ТЕХНИКА -->
+  <section class="slide" id="tech-hacks-2">
+    <div class="section-header tech">ТЕХНИЧЕСКИЕ ЛАЙФХАКИ</div>
+    <h2>15. ТЕХНИЧЕСКОЕ ПРЕВОСХОДСТВО</h2>
+    <div class="grid-2">
+      <div class="card tech-card">
+        <strong>INDEXNOW API</strong>
+        <p>Официальный протокол для мгновенной индексации.</p>
+        <ul>
+          <li>Скрипт отправляет POST-запрос в Яндекс при сохранении страницы.</li>
+          <li>Робот приходит через 5-10 минут.</li>
+          <li>Обязательно для новостей и e-com.</li>
+        </ul>
+      </div>
+      <div class="card tech-card">
+        <strong>CLEAN-PARAM (ROBOTS.TXT)</strong>
+        <p>Директива, которую понимает только Яндекс.</p>
+        <p><code>Clean-param: utm_source /catalog/</code></p>
+        <p>Указывает роботу не индексировать параметры метки. Спасает от дублей и экономит ресурсы робота.</p>
+      </div>
+    </div>
+    <div class="pro-tip">
+      <strong>РЕГИОНАЛЬНОСТЬ:</strong> Используйте ПОДПАПКИ (`site.ru/spb/`), а не поддомены (`spb.site.ru`). Подпапки наследуют хостовые факторы (возраст, траст) основного домена. Поддомены Яндекс часто считает "новыми сайтами" и кидает в песочницу.
+    </div>
+  </section>
+
+  <!-- ИНСТРУМЕНТЫ -->
+  <section class="slide" id="tools">
+    <h2>16. ИНСТРУМЕНТАРИЙ SEO-СПЕЦИАЛИСТА 2026</h2>
+    <div class="grid">
+      <div class="card">
+        <strong>АНАЛИТИКА</strong>
+        <ul>
+          <li><strong>Яндекс.Вебмастер:</strong> База. Ошибки, индексация, отзывы.</li>
+          <li><strong>Яндекс.Метрика:</strong> Обязательно (ПФ). Вебвизор.</li>
+          <li><strong>IndexNow:</strong> Авто-пинг.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <strong>СЕМАНТИКА & ТЕКСТ</strong>
+        <ul>
+          <li><strong>KeyCollector 4:</strong> Сбор ядра.</li>
+          <li><strong>Just-Magic:</strong> LSI, акварель, кластеризация.</li>
+          <li><strong>Arsenkin Tools:</strong> Парсинг подсветок, выгрузка ТОП-10.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <strong>GRAY HAT</strong>
+        <ul>
+          <li><strong>Zennoposter:</strong> Автоматизация всего.</li>
+          <li><strong>XEvil:</strong> Разгадывание капчи Яндекса (SmartCaptcha).</li>
+          <li><strong>A-Parser:</strong> Парсинг выдачи в промышленных масштабах.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <nav>
+    <a href="#intro">В НАЧАЛО</a>
+    <div class="divider"></div>
+    <a href="#evolution">1. ИСТОРИЯ</a>
+    <a href="#ranking-mechanics">2. МЕХАНИКА (L1-L3)</a>
+    <a href="#ranking-factors">3. ФОРМУЛА</a>
+    <a href="#geo-ai">4. GEO & NEURO</a>
+    <a href="#media-stacking">5. СМИ (STACKING)</a>
+    <a href="#commercial-general">6. E-COM (ОБЩЕЕ)</a>
+    <a href="#commercial-listing">7. ЛИСТИНГ</a>
+    <a href="#commercial-card">8. КАРТОЧКА</a>
+    <a href="#yati-deep">9. YATI & LSI</a>
+    <a href="#structure">10. СТРУКТУРА</a>
+    <div class="divider"></div>
+    <a href="#pf-theory">11. ПФ ТЕОРИЯ</a>
+    <a href="#pf-practice">12. ПФ ПРАКТИКА</a>
+    <a href="#monopoly">13. МОНОПОЛИЯ</a>
+    <div class="divider"></div>
+    <a href="#filters-all">14. ФИЛЬТРЫ</a>
+    <a href="#tech-hacks-2">15. ТЕХНИКА</a>
+    <a href="#tools">16. СОФТ</a>
+  </nav>
+
+</body>
+</html>

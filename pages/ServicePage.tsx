@@ -59,6 +59,23 @@ const ServicePage: React.FC<ServicePageProps> = ({
     },
   };
   const currentLabel = title;
+  const directAnswer =
+    lang === 'ru'
+      ? `${title} — это AI-сервис Нейро Завод для автоматизации контент-процессов с публикацией в нужные каналы без ручной рутины.`
+      : `${title} is an AI service by Neuro Factory that automates content workflows and publishing without manual routine.`;
+  const metrics = lang === 'ru'
+    ? [
+        { metric: 'Режим работы', value: '24/7' },
+        { metric: 'Поддержка каналов', value: '15+ платформ' },
+        { metric: 'Модели и инструменты', value: '10+ AI-инструментов' },
+        { metric: 'Потенциал выпуска', value: 'до 1 000+ единиц контента в месяц' },
+      ]
+    : [
+        { metric: 'Operating mode', value: '24/7' },
+        { metric: 'Channel support', value: '15+ platforms' },
+        { metric: 'Models and tools', value: '10+ AI tools' },
+        { metric: 'Output potential', value: 'up to 1,000+ content units per month' },
+      ];
   const breadcrumbsSchema = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -123,8 +140,19 @@ const ServicePage: React.FC<ServicePageProps> = ({
         </p>
         <div className="bg-white/5 border border-white/10 p-10 rounded-3xl mb-8">
           <h2 className="text-2xl font-bold mb-6 uppercase">
-            {lang === 'ru' ? 'Проблема, которую решаем' : 'Problem We Solve'}
+            {lang === 'ru' ? `Что это за решение: ${title}?` : `What is ${title}?`}
           </h2>
+          <p className="text-gray-300 leading-relaxed">{directAnswer}</p>
+        </div>
+        <div className="bg-white/5 border border-white/10 p-10 rounded-3xl mb-8">
+          <h2 className="text-2xl font-bold mb-6 uppercase">
+            {lang === 'ru' ? `Какую задачу решает ${title}?` : `What problem does ${title} solve?`}
+          </h2>
+          <p className="text-gray-300 mb-5">
+            {lang === 'ru'
+              ? 'Решение закрывает ключевые операционные узкие места: скорость производства, стабильность качества и предсказуемость публикаций.'
+              : 'This solution addresses critical operational bottlenecks: production speed, quality consistency, and predictable publishing cadence.'}
+          </p>
           <ul className="space-y-4 text-gray-300">
             {problem.map((item) => (
               <li key={item} className="flex items-start gap-3">
@@ -136,8 +164,13 @@ const ServicePage: React.FC<ServicePageProps> = ({
         </div>
         <div className="bg-white/5 border border-white/10 p-10 rounded-3xl mb-8">
           <h2 className="text-2xl font-bold mb-6 uppercase">
-            {lang === 'ru' ? 'Как работает решение' : 'How the Solution Works'}
+            {lang === 'ru' ? `Как работает ${title}?` : `How does ${title} work?`}
           </h2>
+          <p className="text-gray-300 mb-5">
+            {lang === 'ru'
+              ? 'Пайплайн строится как последовательность AI-шагов: подготовка, генерация, адаптация формата и передача в публикацию.'
+              : 'The pipeline is built as AI-driven stages: preparation, generation, format adaptation, and publishing handoff.'}
+          </p>
           <ul className="space-y-4 text-gray-300">
             {solution.map((item) => (
               <li key={item} className="flex items-start gap-3">
@@ -149,8 +182,13 @@ const ServicePage: React.FC<ServicePageProps> = ({
         </div>
         <div className="bg-white/5 border border-white/10 p-10 rounded-3xl">
           <h2 className="text-2xl font-bold mb-6 uppercase">
-            {lang === 'ru' ? 'Что мы предлагаем' : 'What we offer'}
+            {lang === 'ru' ? `Что включает ${title}?` : `What does ${title} include?`}
           </h2>
+          <p className="text-gray-300 mb-5">
+            {lang === 'ru'
+              ? 'Вы получаете набор функциональных блоков, которые можно масштабировать под частоту публикаций и KPI бизнеса.'
+              : 'You get modular capabilities that scale with your publishing frequency and business KPIs.'}
+          </p>
           <ul className="space-y-4 text-gray-300">
             {features.map((feature) => (
               <li key={feature} className="flex items-start gap-3">
@@ -159,6 +197,21 @@ const ServicePage: React.FC<ServicePageProps> = ({
               </li>
             ))}
           </ul>
+        </div>
+        <div className="bg-white/5 border border-white/10 p-10 rounded-3xl mt-8">
+          <h2 className="text-2xl font-bold mb-6 uppercase">
+            {lang === 'ru' ? 'Какие метрики подтверждают подход?' : 'Which metrics support this approach?'}
+          </h2>
+          <table className="w-full border-collapse text-left">
+            <tbody>
+              {metrics.map((row) => (
+                <tr key={row.metric} className="border-b border-white/10 last:border-0">
+                  <th className="py-3 pr-4 text-gray-300 font-semibold">{row.metric}</th>
+                  <td className="py-3 text-[#00F0FF]">{row.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="bg-white/5 border border-white/10 p-10 rounded-3xl mt-8">
           <h2 className="text-2xl font-bold mb-6 uppercase">

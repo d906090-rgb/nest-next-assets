@@ -213,8 +213,8 @@ const Footer: React.FC<FooterProps> = ({ lang, content }) => {
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-600 font-mono uppercase tracking-widest">
           <p>{content.copyright}</p>
           <div className="flex gap-8">
-            <a href="#" className="hover:text-[#00F0FF] transition-colors">Privacy</a>
-            <a href="#" className="hover:text-[#00F0FF] transition-colors">Terms</a>
+            <a href="/legal/privacy-policy.pdf" className="hover:text-[#00F0FF] transition-colors">Privacy</a>
+            <a href="/legal/terms-of-use.pdf" className="hover:text-[#00F0FF] transition-colors">Terms</a>
           </div>
         </div>
       </div>

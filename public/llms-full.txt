@@ -1,0 +1,66 @@
+Site: https://tecai.ru
+Entity: Нейро Завод / Контент Завод
+Description:
+Платформа AI-автоматизации контента для бизнеса. Помогает создавать и публиковать контент в режиме 24/7:
+видео, изображения, аудио, автопостинг в соцсети и на сайты.
+
+Offer overview:
+1) Нейро-генерация
+- Нейро-Аватары: AI-аватары для экспертного и бренд-контента
+- Нейро-Видео: генерация роликов для промо, Shorts, UGC
+- Нейро-Аудио: музыка, дубляж, voice cloning
+- Соц Сети: AI-контент и распределение по соцканалам
+- 3D Генерация: ассеты и сцены для e-commerce и рекламы
+- Нейро-Изображения: креативы и визуалы для performance и бренда
+
+2) Автопостинг
+- Автопостинг в Соцсети: публикации в YouTube, VK, Telegram, TikTok и др.
+- Сайты и Блоги: автоматическая публикация SEO-контента в CMS/WordPress
+
+Workflow and integrations:
+- make.com
+- n8n
+- WordPress API
+- Telegram, VK, YouTube APIs (по сценарию интеграций)
+
+Business metrics stated on site:
+- Output potential: up to 1,000+ content units/month
+- Supported channels: 15+ platforms
+- AI tools/models in stack: 10+
+- Operations mode: 24/7
+
+FAQ highlights:
+- Как работает платформа: генерация + адаптация + автопостинг в едином workflow
+- Как обеспечивается качество: пайплайны валидации и корректировка перед публикацией
+- Безопасность: ограничение доступа и разграничение прав
+- Интеграции: make.com / n8n, API-подключения каналов
+
+Team / experts:
+- Андрей Федорчук — Scaling Expert
+- Сергей Федорчук — Corporate EdTech
+- Алмас Азнабаев — Music Producer
+
+Canonical URLs:
+- https://tecai.ru/
+- https://tecai.ru/about
+- https://tecai.ru/faq
+- https://tecai.ru/cases
+- https://tecai.ru/neuro-generation/avatars
+- https://tecai.ru/neuro-generation/video
+- https://tecai.ru/neuro-generation/audio
+- https://tecai.ru/neuro-generation/social
+- https://tecai.ru/neuro-generation/3d
+- https://tecai.ru/neuro-generation/images
+- https://tecai.ru/autoposting/socials
+- https://tecai.ru/autoposting/sites
+
+Legal:
+- https://tecai.ru/legal/legal-info.pdf
+- https://tecai.ru/legal/privacy-policy.pdf
+- https://tecai.ru/legal/terms-of-use.pdf
+- https://tecai.ru/legal/license.pdf
+- https://tecai.ru/legal/cookies-policy.pdf
+
+Contact:
+- Email: ait@tecai.ru
+- Telegram: https://t.me/AI_Technology_avto

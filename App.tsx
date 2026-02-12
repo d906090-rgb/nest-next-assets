@@ -12,6 +12,7 @@ import SocialsPage from './pages/autoposting/SocialsPage';
 import SitesPage from './pages/autoposting/SitesPage';
 import CasesPage from './pages/CasesPage';
 import FAQPage from './pages/FAQPage';
+import AboutPage from './pages/AboutPage';
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'ru'>('ru');
@@ -43,6 +44,7 @@ const App: React.FC = () => {
           </Route>
           
           {/* Other Pages */}
+          <Route path="about" element={<AboutPage lang={lang} />} />
           <Route path="cases" element={<CasesPage lang={lang} />} />
           <Route path="faq" element={<FAQPage lang={lang} />} />
           

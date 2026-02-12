@@ -1,11 +1,10 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useRef, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { Sparkles, Square, Play, ChevronLeft, ChevronRight, Hexagon, Star, Zap, Music, Clapperboard, User, Send as SendIcon, X } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import GradientText from '../components/GlitchText';
 import ArtistCard from '../components/ArtistCard';
-import WantZavodGame from '../WantZavod/App';
 import { useStore as useGameStore } from '../WantZavod/store';
 import { GameStatus } from '../WantZavod/types';
 import PricingCalculator from '../components/PricingCalculator';
@@ -17,6 +16,7 @@ import {
 } from '../components/BrandIcons';
 import { Artist } from '../types';
 import { CONTENT, LINEUP_DATA, getHeroDate } from '../data/content';
+const WantZavodGame = lazy(() => import('../WantZavod/App'));
 
 interface HomeProps {
   lang: 'en' | 'ru';
@@ -478,7 +478,9 @@ const Home: React.FC<HomeProps> = ({ lang }) => {
       
       {/* WantZavod Game Section */}
       <section id="wantzavod" className="relative h-[600px] md:h-[800px] bg-black overflow-hidden border-y border-[#00F0FF]/20">
-         <WantZavodGame />
+         <Suspense fallback={<div className="w-full h-full bg-black" />}>
+           <WantZavodGame />
+         </Suspense>
       </section>
 
       {/* Tickets Section */}

@@ -22,3 +22,7 @@ root.render(
     </HelmetProvider>
   </React.StrictMode>
 );
+
+requestAnimationFrame(() => {
+  document.dispatchEvent(new Event('prerender-ready'));
+});

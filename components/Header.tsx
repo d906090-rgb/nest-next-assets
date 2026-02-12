@@ -155,6 +155,9 @@ const Header: React.FC<HeaderProps> = ({ lang, toggleLang }) => {
           <Link to="/cases" className="hover:text-[#00F0FF] transition-all text-white" data-hover="true">
             {t.nav.cases}
           </Link>
+          <Link to="/about" className="hover:text-[#00F0FF] transition-all text-white" data-hover="true">
+            {lang === 'ru' ? 'О компании' : 'About'}
+          </Link>
           
           <Link to="/faq" className="hover:text-[#00F0FF] transition-all text-white" data-hover="true">
             {t.nav.faq}
@@ -287,6 +290,9 @@ const Header: React.FC<HeaderProps> = ({ lang, toggleLang }) => {
 
             <Link to="/cases" className="font-heading text-3xl text-white uppercase">
               {t.nav.cases}
+            </Link>
+            <Link to="/about" className="font-heading text-3xl text-white uppercase">
+              {lang === 'ru' ? 'О компании' : 'About'}
             </Link>
             
             <Link to="/faq" className="font-heading text-3xl text-white uppercase">

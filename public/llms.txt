@@ -1,0 +1,27 @@
+Site: https://tecai.ru
+Name: Нейро Завод (Neuro Factory)
+Type: AI content automation platform
+Primary language: ru
+Secondary language: en
+
+Summary:
+Нейро Завод автоматизирует контент-производство и публикации: генерация видео, изображений, аудио и автопостинг 24/7.
+Платформа использует AI-модели и workflow-оркестрацию (make.com, n8n) для стабильного выпуска контента под бизнес-KPI.
+
+Core pages:
+- https://tecai.ru/
+- https://tecai.ru/about
+- https://tecai.ru/faq
+- https://tecai.ru/cases
+- https://tecai.ru/neuro-generation/avatars
+- https://tecai.ru/neuro-generation/video
+- https://tecai.ru/neuro-generation/audio
+- https://tecai.ru/neuro-generation/social
+- https://tecai.ru/neuro-generation/3d
+- https://tecai.ru/neuro-generation/images
+- https://tecai.ru/autoposting/socials
+- https://tecai.ru/autoposting/sites
+
+Contact:
+- Email: ait@tecai.ru
+- Telegram: https://t.me/AI_Technology_avto

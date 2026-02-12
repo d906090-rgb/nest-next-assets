@@ -191,7 +191,8 @@ export const CONTENT = {
         {
           title: 'Navigation',
           links: [
-            { label: 'Team', href: '#lineup' },
+            { label: 'About', href: '/about' },
+            { label: 'Team', href: '/about' },
             { label: 'Neural Nets', href: '#experience' },
             { label: 'Tariffs', href: '#tickets' },
             { label: 'FAQ', href: '#faq' }
@@ -212,7 +213,7 @@ export const CONTENT = {
           links: [
             { label: 'Support Bot', href: 'https://t.me/AI_Technology_avto' },
             { label: 'Sales Dept', href: 'https://t.me/AI_Technology_avto' },
-            { label: 'Partnership', href: 'mailto:ait@kontent-zavod-ai.ru' }
+            { label: 'Partnership', href: 'mailto:ait@tecai.ru' }
           ]
         }
       ]
@@ -399,7 +400,8 @@ export const CONTENT = {
         {
           title: 'Навигация',
           links: [
-            { label: 'Команда', href: '#lineup' },
+            { label: 'О компании', href: '/about' },
+            { label: 'Команда', href: '/about' },
             { label: 'Нейросети', href: '#experience' },
             { label: 'Тарифы', href: '#tickets' },
             { label: 'FAQ', href: '#faq' }
@@ -420,7 +422,7 @@ export const CONTENT = {
           links: [
             { label: 'Поддержка', href: 'https://t.me/AI_Technology_avto' },
             { label: 'Отдел продаж', href: 'https://t.me/AI_Technology_avto' },
-            { label: 'Партнерство', href: 'mailto:ait@kontent-zavod-ai.ru' }
+            { label: 'Партнерство', href: 'mailto:ait@tecai.ru' }
           ]
         }
       ]
