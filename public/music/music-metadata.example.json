@@ -3,5 +3,7 @@
   "lastSync": null,
   "syncStatus": "never",
   "channelUsername": "neyrozvuki",
-  "totalTracks": 0
+  "totalTracks": 0,
+  "lastUpdateId": 0,
+  "coverJobs": {}
 }

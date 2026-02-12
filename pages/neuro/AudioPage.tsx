@@ -29,11 +29,11 @@ const AudioPage: React.FC<{ lang: 'en' | 'ru' }> = ({ lang }) => {
           : 'neuro music, AI music, music generation, neural networks, SUNO, Udio, electronic music'} />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-zinc-900 to-black text-white py-8 px-4">
+      <div className="min-h-screen bg-linear-to-b from-gray-900 via-zinc-900 to-black text-white py-8 px-4">
         {/* Header section */}
         <div className="max-w-7xl mx-auto mb-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-linear-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
               {t.heading}
             </h1>
             <p className="text-gray-400 text-lg max-w-2xl mx-auto">

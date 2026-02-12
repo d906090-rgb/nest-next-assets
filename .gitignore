@@ -55,3 +55,7 @@ assets/index-*.js
 assets/index-*.css
 mcp.json
 public/music/covers/
+public/music/music-metadata.json
+!public/music/music-metadata.example.json
+public/music/music-metadata.json
+!public/music/music-metadata.example.json

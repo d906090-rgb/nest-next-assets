@@ -12,7 +12,6 @@ import {
   Music,
   Disc,
   Clock,
-  MoreHorizontal,
   RefreshCw,
 } from 'lucide-react';
 
@@ -70,8 +69,6 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
   const [likedTracks, setLikedTracks] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [queue, setQueue] = useState<Track[]>([]);
-
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Load music metadata
@@ -211,8 +208,16 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
       if (response.ok) {
         const data = await response.json();
         setMetadata(data);
-        if (data.albums.length > 0 && !selectedAlbum) {
-          setSelectedAlbum(data.albums[0]);
+        if (data.albums.length > 0) {
+          if (!selectedAlbum) {
+            setSelectedAlbum(data.albums[0]);
+          } else {
+            const refreshedAlbum = data.albums.find((album) => album.id === selectedAlbum.id);
+            setSelectedAlbum(refreshedAlbum || data.albums[0]);
+          }
+        } else {
+          setSelectedAlbum(null);
+          setCurrentTrack(null);
         }
       }
     } catch (error) {
@@ -238,14 +243,14 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96 bg-gradient-to-b from-zinc-900 to-black rounded-xl">
+      <div className="flex items-center justify-center h-96 bg-linear-to-b from-zinc-900 to-black rounded-xl">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-b from-zinc-900 via-zinc-900 to-black rounded-xl overflow-hidden shadow-2xl">
+    <div className="bg-linear-to-b from-zinc-900 via-zinc-900 to-black rounded-xl overflow-hidden shadow-2xl">
       {/* Hidden audio element */}
       <audio ref={audioRef} preload="metadata" />
 
@@ -283,7 +288,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
                       : 'hover:bg-zinc-800/50'
                   }`}
                 >
-                  <div className="w-12 h-12 rounded bg-zinc-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="w-12 h-12 rounded bg-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
                     {album.coverUrl ? (
                       <img
                         src={album.coverUrl}
@@ -312,12 +317,12 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
         </div>
 
         {/* Main content - Track list */}
-        <div className="flex-1 bg-gradient-to-b from-zinc-800/50 to-zinc-900 flex flex-col">
+        <div className="flex-1 bg-linear-to-b from-zinc-800/50 to-zinc-900 flex flex-col">
           {/* Album header */}
           {selectedAlbum && (
-            <div className="p-6 bg-gradient-to-b from-zinc-700/30 to-transparent">
+            <div className="p-6 bg-linear-to-b from-zinc-700/30 to-transparent">
               <div className="flex items-end gap-6">
-                <div className="w-48 h-48 rounded-lg shadow-2xl overflow-hidden bg-zinc-800 flex-shrink-0">
+                <div className="w-48 h-48 rounded-lg shadow-2xl overflow-hidden bg-zinc-800 shrink-0">
                   {selectedAlbum.coverUrl ? (
                     <img
                       src={selectedAlbum.coverUrl}

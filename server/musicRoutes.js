@@ -2,9 +2,11 @@ import { rateLimit } from 'express-rate-limit';
 import fs from 'fs/promises';
 import path from 'path';
 
-const MUSIC_METADATA_PATH = '/var/www/www-root/data/www/tecai.ru/public/music/music-metadata.json';
-const MUSIC_DIR = '/var/www/www-root/data/www/tecai.ru/public/music';
-const COVERS_DIR = path.join(MUSIC_DIR, 'covers');
+const MUSIC_RUNTIME_DIR = process.env.MUSIC_RUNTIME_DIR || '/var/lib/tecai/music';
+const MUSIC_METADATA_PATH = path.join(MUSIC_RUNTIME_DIR, 'music-metadata.json');
+const COVERS_DIR = path.join(MUSIC_RUNTIME_DIR, 'covers');
+const AUDIO_CACHE_DIR = path.join(MUSIC_RUNTIME_DIR, 'audio-cache');
+const DEFAULT_CHANNEL_USERNAME = 'neyrozvuki';
 
 const musicSyncLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -22,194 +24,373 @@ const coverLimiter = rateLimit({
   message: { error: 'Cover generation rate limit exceeded.' },
 });
 
-// Ensure directories exist
 const ensureDirs = async () => {
-  try {
-    await fs.mkdir(MUSIC_DIR, { recursive: true });
-    await fs.mkdir(COVERS_DIR, { recursive: true });
-  } catch (e) {
-    // Ignore
-  }
+  await fs.mkdir(MUSIC_RUNTIME_DIR, { recursive: true });
+  await fs.mkdir(COVERS_DIR, { recursive: true });
+  await fs.mkdir(AUDIO_CACHE_DIR, { recursive: true });
 };
 
-// Read music metadata
+const defaultMetadata = () => ({
+  albums: [],
+  lastSync: null,
+  syncStatus: 'never',
+  channelUsername: DEFAULT_CHANNEL_USERNAME,
+  totalTracks: 0,
+  lastUpdateId: 0,
+  coverJobs: {},
+});
+
 const readMetadata = async () => {
   try {
     await ensureDirs();
     const data = await fs.readFile(MUSIC_METADATA_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch {
+    const parsed = JSON.parse(data);
     return {
-      albums: [],
-      lastSync: null,
-      syncStatus: 'never',
-      channelUsername: 'neyrozvuki',
-      totalTracks: 0,
+      ...defaultMetadata(),
+      ...parsed,
+      albums: Array.isArray(parsed.albums) ? parsed.albums : [],
+      coverJobs: parsed.coverJobs && typeof parsed.coverJobs === 'object' ? parsed.coverJobs : {},
     };
+  } catch {
+    return defaultMetadata();
   }
 };
 
-// Write music metadata
 const writeMetadata = async (metadata) => {
   await ensureDirs();
   await fs.writeFile(MUSIC_METADATA_PATH, JSON.stringify(metadata, null, 2));
 };
 
+const createAlbumId = (albumTitle) => `album_${Buffer.from(albumTitle).toString('base64url').slice(0, 18)}`;
+
+const parseTrackAndAlbum = (audio) => {
+  const rawTitle = (audio.title || audio.file_name || 'Unknown Track').trim();
+  const performer = (audio.performer || 'AI Generated').trim();
+
+  if (rawTitle.includes(' - ')) {
+    const parts = rawTitle.split(' - ');
+    if (parts.length >= 2) {
+      return {
+        albumTitle: parts[0].trim() || 'Neuro Music Collection',
+        trackTitle: parts.slice(1).join(' - ').trim() || rawTitle,
+        artist: performer,
+      };
+    }
+  }
+
+  return {
+    albumTitle: 'Neuro Music Collection',
+    trackTitle: rawTitle,
+    artist: performer,
+  };
+};
+
+const shouldIncludePost = (post, channelUsername) => {
+  if (!post || !post.audio || !post.chat) return false;
+  if (post.chat.type !== 'channel') return false;
+  const username = (post.chat.username || '').toLowerCase();
+  return username === (channelUsername || '').toLowerCase();
+};
+
+const startCoverJob = async (album, metadata, kieApiKey) => {
+  if (!kieApiKey || album.coverUrl || metadata.coverJobs?.[album.id]?.status === 'processing') {
+    return;
+  }
+
+  const coverPrompt = `Abstract album cover for "${album.title}" electronic neuro music, premium design, vibrant and cinematic`;
+  const response = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${kieApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'z-image',
+      input: {
+        prompt: coverPrompt,
+        aspect_ratio: '1:1',
+      },
+    }),
+  });
+
+  const result = await response.json();
+  if (result?.code === 0 && result?.data?.taskId) {
+    metadata.coverJobs[album.id] = {
+      taskId: result.data.taskId,
+      status: 'processing',
+      updatedAt: new Date().toISOString(),
+    };
+  }
+};
+
+const resolveCoverJobs = async (metadata, kieApiKey) => {
+  if (!kieApiKey || !metadata.coverJobs) return;
+
+  const entries = Object.entries(metadata.coverJobs);
+  for (const [albumId, job] of entries) {
+    if (!job || job.status !== 'processing' || !job.taskId) continue;
+
+    try {
+      const response = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${job.taskId}`, {
+        headers: {
+          Authorization: `Bearer ${kieApiKey}`,
+        },
+      });
+      const result = await response.json();
+
+      if (result?.code !== 0 || !result?.data) {
+        continue;
+      }
+
+      if (result.data.status === 'PROCESSING') {
+        continue;
+      }
+
+      if (result.data.status === 'SUCCESS') {
+        const outputUrl = result.data?.output?.url || result.data?.output?.image_url;
+        if (!outputUrl) {
+          metadata.coverJobs[albumId] = {
+            ...job,
+            status: 'error',
+            updatedAt: new Date().toISOString(),
+            reason: 'missing_output_url',
+          };
+          continue;
+        }
+
+        const imageResponse = await fetch(outputUrl);
+        if (!imageResponse.ok) {
+          metadata.coverJobs[albumId] = {
+            ...job,
+            status: 'error',
+            updatedAt: new Date().toISOString(),
+            reason: `download_failed_${imageResponse.status}`,
+          };
+          continue;
+        }
+
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const filename = `${albumId}-${job.taskId}.webp`;
+        const filepath = path.join(COVERS_DIR, filename);
+        await fs.writeFile(filepath, Buffer.from(imageBuffer));
+
+        const album = metadata.albums.find((item) => item.id === albumId);
+        if (album) {
+          album.coverUrl = `/api/music/cover-file/${filename}`;
+          album.coverGenerated = true;
+        }
+
+        metadata.coverJobs[albumId] = {
+          ...job,
+          status: 'success',
+          updatedAt: new Date().toISOString(),
+          filename,
+        };
+      } else {
+        metadata.coverJobs[albumId] = {
+          ...job,
+          status: 'error',
+          updatedAt: new Date().toISOString(),
+          reason: result.data.status || 'unknown',
+        };
+      }
+    } catch (error) {
+      metadata.coverJobs[albumId] = {
+        ...job,
+        status: 'error',
+        updatedAt: new Date().toISOString(),
+        reason: error?.message || 'unexpected_error',
+      };
+    }
+  }
+};
+
 export const setupMusicRoutes = (app) => {
-  // Get albums and tracks
   app.get('/api/music/albums', async (req, res) => {
     try {
       const metadata = await readMetadata();
       res.json(metadata);
     } catch (error) {
-      console.error('Music metadata read error:', error);
-      res.json({
-        albums: [],
-        lastSync: null,
-        syncStatus: 'never',
-        channelUsername: 'neyrozvuki',
-        totalTracks: 0,
-      });
+      res.status(500).json({ error: 'Failed to read music metadata' });
     }
   });
 
-  // Sync with Telegram channel
-  app.post('/api/music/sync', musicSyncLimiter, async (req, res) => {
+  app.get('/api/music/sync-status', async (req, res) => {
     try {
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-
-      if (!token) {
-        return res.status(500).json({ error: 'Telegram bot token not configured' });
-      }
-
       const metadata = await readMetadata();
+      res.json({
+        syncStatus: metadata.syncStatus,
+        lastSync: metadata.lastSync,
+        totalTracks: metadata.totalTracks,
+        totalAlbums: metadata.albums.length,
+        lastUpdateId: metadata.lastUpdateId,
+      });
+    } catch {
+      res.status(500).json({ error: 'Failed to read sync status' });
+    }
+  });
 
-      // Update sync status
-      metadata.syncStatus = 'syncing';
-      await writeMetadata(metadata);
+  app.post('/api/music/sync', musicSyncLimiter, async (req, res) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const kieApiKey = process.env.KIE_AI_API_KEY;
 
-      // Fetch posts from Telegram channel
-      const channelUsername = metadata.channelUsername || 'neyrozvuki';
-      const updatesUrl = `https://api.telegram.org/bot${token}/getUpdates?allowed_updates=["channel_post"]&limit=100`;
-      const updatesResponse = await fetch(updatesUrl);
-      const updatesData = await updatesResponse.json();
+    if (!token) {
+      return res.status(500).json({ error: 'Telegram bot token not configured' });
+    }
 
-      const albumsMap = new Map();
+    const metadata = await readMetadata();
+    metadata.syncStatus = 'syncing';
+    await writeMetadata(metadata);
 
-      if (updatesData.ok && updatesData.result) {
-        for (const update of updatesData.result) {
+    try {
+      const channelUsername = metadata.channelUsername || DEFAULT_CHANNEL_USERNAME;
+      const seenUniqueIds = new Set(
+        metadata.albums.flatMap((album) =>
+          album.tracks.map((track) => track.fileUniqueId).filter(Boolean),
+        ),
+      );
+
+      const albumsById = new Map(metadata.albums.map((album) => [album.id, album]));
+      let offset = Number(metadata.lastUpdateId || 0) + 1;
+      let keepFetching = true;
+      let loopGuard = 0;
+      const newAlbumIds = new Set();
+
+      while (keepFetching && loopGuard < 20) {
+        loopGuard += 1;
+        const updatesUrl =
+          `https://api.telegram.org/bot${token}/getUpdates?allowed_updates=["channel_post"]&limit=100&offset=${offset}`;
+        const updatesResponse = await fetch(updatesUrl);
+        const updatesData = await updatesResponse.json();
+        const updates = updatesData?.result || [];
+
+        if (!updatesData?.ok) {
+          throw new Error(updatesData?.description || 'Failed to fetch Telegram updates');
+        }
+
+        if (!updates.length) {
+          break;
+        }
+
+        for (const update of updates) {
           const post = update.channel_post;
-          if (!post) continue;
+          if (update.update_id && update.update_id >= offset) {
+            offset = update.update_id + 1;
+            metadata.lastUpdateId = update.update_id;
+          }
+
+          if (!shouldIncludePost(post, channelUsername)) {
+            continue;
+          }
 
           const audio = post.audio;
-          if (audio) {
-            const trackId = `track_${audio.file_unique_id}`;
-            const title = audio.title || audio.file_name || 'Unknown Track';
-            const artist = audio.performer || 'AI Generated';
-            const duration = audio.duration || 180;
-
-            // Extract album from title
-            let albumTitle = 'Neuro Music Collection';
-            let trackTitle = title;
-
-            if (title.includes(' - ')) {
-              const parts = title.split(' - ');
-              if (parts.length >= 2) {
-                albumTitle = parts[0].trim();
-                trackTitle = parts.slice(1).join(' - ').trim();
-              }
-            }
-
-            if (!albumsMap.has(albumTitle)) {
-              albumsMap.set(albumTitle, {
-                id: `album_${Buffer.from(albumTitle).toString('base64').slice(0, 16)}`,
-                title: albumTitle,
-                artist: artist,
-                coverUrl: null,
-                coverGenerated: false,
-                trackCount: 0,
-                tracks: [],
-                createdAt: new Date().toISOString(),
-              });
-            }
-
-            const album = albumsMap.get(albumTitle);
-            const track = {
-              id: trackId,
-              title: trackTitle,
-              artist: artist,
-              albumId: album.id,
-              duration: duration,
-              audioUrl: `/api/music/file/${audio.file_id}`,
-              telegramFileId: audio.file_id,
-              telegramPostId: post.message_id,
-              createdAt: new Date(post.date * 1000).toISOString(),
-            };
-
-            album.tracks.push(track);
-            album.trackCount = album.tracks.length;
+          const uniqueId = audio.file_unique_id;
+          if (!uniqueId || seenUniqueIds.has(uniqueId)) {
+            continue;
           }
+
+          const parsed = parseTrackAndAlbum(audio);
+          const albumId = createAlbumId(parsed.albumTitle);
+          if (!albumsById.has(albumId)) {
+            albumsById.set(albumId, {
+              id: albumId,
+              title: parsed.albumTitle,
+              artist: parsed.artist,
+              coverUrl: null,
+              coverGenerated: false,
+              trackCount: 0,
+              tracks: [],
+              createdAt: new Date(post.date * 1000).toISOString(),
+            });
+            newAlbumIds.add(albumId);
+          }
+
+          const album = albumsById.get(albumId);
+          const track = {
+            id: `track_${uniqueId}`,
+            title: parsed.trackTitle,
+            artist: parsed.artist,
+            albumId,
+            duration: audio.duration || 180,
+            audioUrl: `/api/music/file/${audio.file_id}`,
+            telegramFileId: audio.file_id,
+            fileUniqueId: uniqueId,
+            telegramPostId: post.message_id,
+            createdAt: new Date(post.date * 1000).toISOString(),
+          };
+
+          album.tracks.unshift(track);
+          album.trackCount = album.tracks.length;
+          seenUniqueIds.add(uniqueId);
+        }
+
+        keepFetching = updates.length === 100;
+      }
+
+      metadata.albums = Array.from(albumsById.values())
+        .map((album) => ({
+          ...album,
+          tracks: [...album.tracks].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          ),
+          trackCount: album.tracks.length,
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      metadata.totalTracks = metadata.albums.reduce((acc, album) => acc + album.tracks.length, 0);
+
+      for (const albumId of newAlbumIds) {
+        const album = metadata.albums.find((item) => item.id === albumId);
+        if (album) {
+          await startCoverJob(album, metadata, kieApiKey);
         }
       }
 
-      const albums = Array.from(albumsMap.values()).sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      await resolveCoverJobs(metadata, kieApiKey);
 
-      let totalTracks = 0;
-      albums.forEach(a => totalTracks += a.tracks.length);
-
-      metadata.albums = albums;
-      metadata.totalTracks = totalTracks;
       metadata.lastSync = new Date().toISOString();
       metadata.syncStatus = 'success';
-
       await writeMetadata(metadata);
 
       res.json(metadata);
     } catch (error) {
-      console.error('Music sync error:', error);
-
-      try {
-        const metadata = await readMetadata();
-        metadata.syncStatus = 'error';
-        await writeMetadata(metadata);
-      } catch {
-        // Ignore
-      }
-
-      res.status(500).json({ error: 'Sync failed', message: error.message });
+      metadata.syncStatus = 'error';
+      metadata.lastSync = new Date().toISOString();
+      await writeMetadata(metadata);
+      res.status(500).json({ error: 'Sync failed', message: error?.message || 'Unknown error' });
     }
   });
 
-  // Serve audio file from Telegram
   app.get('/api/music/file/:fileId', async (req, res) => {
     try {
       const { fileId } = req.params;
       const token = process.env.TELEGRAM_BOT_TOKEN;
-
       if (!token) {
         return res.status(500).json({ error: 'Telegram bot token not configured' });
       }
 
-      const filePathUrl = `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`;
-      const filePathResponse = await fetch(filePathUrl);
+      const filePathResponse = await fetch(
+        `https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`,
+      );
       const filePathData = await filePathResponse.json();
-
-      if (!filePathData.ok) {
+      if (!filePathData?.ok || !filePathData?.result?.file_path) {
         return res.status(404).json({ error: 'File not found' });
       }
 
-      const filePath = filePathData.result.file_path;
-      const fileUrl = `https://api.telegram.org/file/bot${token}/${filePath}`;
-
+      const fileUrl = `https://api.telegram.org/file/bot${token}/${filePathData.result.file_path}`;
       const fileResponse = await fetch(fileUrl);
-      if (!fileResponse.ok) {
-        return res.status(fileResponse.status).json({ error: 'Failed to fetch file' });
+      if (!fileResponse.ok || !fileResponse.body) {
+        return res.status(fileResponse.status || 502).json({ error: 'Failed to fetch file' });
       }
 
-      res.setHeader('Content-Type', 'audio/mpeg');
+      const contentType = fileResponse.headers.get('content-type') || 'application/octet-stream';
+      const contentLength = fileResponse.headers.get('content-length');
+      res.setHeader('Content-Type', contentType);
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength);
+      }
 
       const reader = fileResponse.body.getReader();
       while (true) {
@@ -219,122 +400,75 @@ export const setupMusicRoutes = (app) => {
       }
       res.end();
     } catch (error) {
-      console.error('Music file serve error:', error);
       res.status(500).json({ error: 'Failed to serve audio file' });
     }
   });
 
-  // Generate album cover
+  app.get('/api/music/cover-file/:filename', async (req, res) => {
+    try {
+      const filename = path.basename(req.params.filename);
+      const filepath = path.join(COVERS_DIR, filename);
+      const file = await fs.readFile(filepath);
+      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      res.send(file);
+    } catch {
+      res.status(404).json({ error: 'Cover not found' });
+    }
+  });
+
   app.post('/api/music/cover/:albumId', coverLimiter, async (req, res) => {
     try {
       const { albumId } = req.params;
-      const { prompt } = req.body;
-      const metadata = await readMetadata();
-      const album = metadata.albums.find(a => a.id === albumId);
+      const { prompt } = req.body || {};
+      const kieApiKey = process.env.KIE_AI_API_KEY;
+      if (!kieApiKey) {
+        return res.status(500).json({ error: 'KIE AI key not configured' });
+      }
 
+      const metadata = await readMetadata();
+      const album = metadata.albums.find((item) => item.id === albumId);
       if (!album) {
         return res.status(404).json({ error: 'Album not found' });
       }
 
-      const coverPrompt = prompt || `Abstract album cover art for "${album.title}" music album, digital art, vibrant colors, professional design`;
-      const apiKey = process.env.KIE_AI_API_KEY;
-
-      const response = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+      await startCoverJob(
+        {
+          ...album,
+          title: prompt ? `${album.title} ${prompt}` : album.title,
         },
-        body: JSON.stringify({
-          model: 'z-image',
-          input: {
-            prompt: coverPrompt,
-            aspect_ratio: '1:1',
-          },
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.code === 0 && result.data?.taskId) {
-        res.json({
-          taskId: result.data.taskId,
-          albumId: albumId,
-          message: 'Cover generation started',
-        });
-      } else {
-        res.status(400).json({ error: result.msg || 'Failed to start cover generation' });
-      }
+        metadata,
+        kieApiKey,
+      );
+      await writeMetadata(metadata);
+      res.json({ status: 'processing', job: metadata.coverJobs[album.id] || null });
     } catch (error) {
-      console.error('Cover generation error:', error);
-      res.status(500).json({ error: 'Failed to generate cover' });
+      res.status(500).json({ error: 'Failed to start cover generation' });
     }
   });
 
-  // Check cover generation status
   app.get('/api/music/cover-status/:taskId', async (req, res) => {
     try {
       const { taskId } = req.params;
-      const apiKey = process.env.KIE_AI_API_KEY;
-
-      const response = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (result.code === 0 && result.data?.status === 'SUCCESS' && result.data?.output?.url) {
-        const coverUrl = result.data.output.url;
-        const coverResponse = await fetch(coverUrl);
-        const coverBuffer = await coverResponse.arrayBuffer();
-        const coverFilename = `cover_${taskId}.webp`;
-        const coverPath = path.join(COVERS_DIR, coverFilename);
-
-        await fs.writeFile(coverPath, Buffer.from(coverBuffer));
-
-        res.json({
-          status: 'success',
-          coverUrl: `/music/covers/${coverFilename}`,
-        });
-      } else if (result.data?.status === 'PROCESSING') {
-        res.json({
-          status: 'processing',
-          message: 'Cover is still being generated',
-        });
-      } else {
-        res.json({
-          status: 'error',
-          error: result.msg || 'Unknown error',
-        });
-      }
-    } catch (error) {
-      console.error('Cover status check error:', error);
-      res.status(500).json({ error: 'Failed to check cover status' });
-    }
-  });
-
-  // Apply cover to album
-  app.post('/api/music/apply-cover/:albumId', async (req, res) => {
-    try {
-      const { albumId } = req.params;
-      const { coverUrl } = req.body;
       const metadata = await readMetadata();
-      const album = metadata.albums.find(a => a.id === albumId);
-
-      if (!album) {
-        return res.status(404).json({ error: 'Album not found' });
+      const jobEntry = Object.entries(metadata.coverJobs || {}).find(
+        ([, job]) => job?.taskId === taskId,
+      );
+      if (!jobEntry) {
+        return res.status(404).json({ error: 'Cover job not found' });
       }
 
-      album.coverUrl = coverUrl;
-      album.coverGenerated = true;
-      await writeMetadata(metadata);
-
-      res.json({ success: true, album });
-    } catch (error) {
-      console.error('Apply cover error:', error);
-      res.status(500).json({ error: 'Failed to apply cover' });
+      const [albumId, job] = jobEntry;
+      const album = metadata.albums.find((item) => item.id === albumId);
+      res.json({
+        status: job.status,
+        albumId,
+        coverUrl: album?.coverUrl || null,
+        updatedAt: job.updatedAt,
+        reason: job.reason || null,
+      });
+    } catch {
+      res.status(500).json({ error: 'Failed to read cover job status' });
     }
   });
 };
