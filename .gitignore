@@ -54,3 +54,4 @@ server/package-lock.json
 assets/index-*.js
 assets/index-*.css
 mcp.json
+public/music/covers/

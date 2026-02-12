@@ -1,73 +1,67 @@
 import React from 'react';
-import ServicePage from '../ServicePage';
+import { Helmet } from 'react-helmet-async';
+import SpotifyPlayer from '../../components/SpotifyPlayer';
 
-const AudioPage: React.FC<{ lang: 'en' | 'ru' }> = ({ lang }) => (
-  <ServicePage 
-    lang={lang} 
-    title={lang === 'ru' ? 'Нейро-Аудио' : 'Neuro-Audio'} 
-    slug="/neuro-generation/audio"
-    description={lang === 'ru' 
-      ? 'Генерация музыки, клонирование голоса и дубляж контента для подкастов, рекламы и видео: быстрый продакшн на нейросетях с автоматизацией make.com и n8n.' 
-      : 'AI music generation, voice cloning, and dubbing for podcasts, ads, and videos with automated pipelines powered by make.com and n8n.'}
-    features={lang === 'ru'
-      ? [
-          'Оригинальные треки и джинглы под ваш бренд',
-          'Дубляж и локализация видео на несколько языков',
-          'Клонирование голоса для единого звучания контента',
-        ]
-      : [
-          'Original tracks and jingles tailored to your brand',
-          'Video dubbing and localization for multiple languages',
-          'Voice cloning for consistent content sound',
-        ]}
-    keywords={lang === 'ru'
-      ? ['генерация музыки', 'клонирование голоса', 'дубляж', 'AI аудио', 'нейросети', 'SUNO', 'Udio']
-      : ['music generation', 'voice cloning', 'dubbing', 'ai audio', 'suno', 'udio']}
-    tools={lang === 'ru'
-      ? ['SUNO', 'Udio', 'ElevenLabs', 'Whisper', 'n8n']
-      : ['SUNO', 'Udio', 'ElevenLabs', 'Whisper', 'n8n']}
-    problem={lang === 'ru'
-      ? [
-          'Аудиопродакшн требует много ручной работы, особенно при мультиязычных кампаниях.',
-          'Разный тон голоса и стиль треков снижает узнаваемость бренда.',
-        ]
-      : [
-          'Audio production becomes expensive and slow, especially for multi-language campaigns.',
-          'Inconsistent voice and music style weakens brand recognition.',
-        ]}
-    solution={lang === 'ru'
-      ? [
-          'Система генерирует музыку, озвучку и дубляж по заданному тону бренда и каналу публикации.',
-          'AI-workflow автоматически готовит финальные дорожки под видео, подкасты и рекламу.',
-        ]
-      : [
-          'The system generates music, narration, and dubbing aligned with your brand tone and platform format.',
-          'AI workflows deliver final audio tracks for videos, podcasts, and ad creatives automatically.',
-        ]}
-    useCases={lang === 'ru'
-      ? [
-          'Озвучка и дубляж экспертных роликов.',
-          'Фоновая музыка для видео и Reels.',
-          'Голос бренда для подкастов и автоответчиков.',
-        ]
-      : [
-          'Narration and dubbing for expert videos.',
-          'Background music for Reels and short videos.',
-          'Consistent brand voice for podcasts and assistants.',
-        ]}
-    integrations={lang === 'ru'
-      ? ['Интеграции с n8n и make.com', 'Экспорт в видеомонтажные пайплайны', 'Подключение к Telegram и YouTube публикациям']
-      : ['n8n and make.com integrations', 'Export to video editing pipelines', 'Delivery into Telegram and YouTube workflows']}
-    parentLabel={lang === 'ru' ? 'Нейрогенерация' : 'Neurogeneration'}
-    relatedLinks={lang === 'ru'
-      ? [
-          { label: 'Нейро-Видео', href: '/neuro-generation/video' },
-          { label: 'Нейро-Аватары', href: '/neuro-generation/avatars' },
-        ]
-      : [
-          { label: 'Neuro-Video', href: '/neuro-generation/video' },
-          { label: 'Neuro-Avatars', href: '/neuro-generation/avatars' },
-        ]}
-  />
-);
+const AudioPage: React.FC<{ lang: 'en' | 'ru' }> = ({ lang }) => {
+  const t = {
+    title: lang === 'ru' ? 'Нейро-Аудио — AI-автоматизация | Нейро Завод' : 'Neuro-Audio — AI Automation | Neuro Factory',
+    description: lang === 'ru'
+      ? 'Слушайте нейро-музыку, созданную искусственным интеллектом. Демонстрация возможностей AI-генерации музыки всех жанров.'
+      : 'Listen to neuro-music created by artificial intelligence. Demo of AI music generation capabilities across all genres.',
+    heading: lang === 'ru' ? 'Нейро-Музыка' : 'Neuro Music',
+    subtitle: lang === 'ru'
+      ? 'Музыка, созданная нейросетями. Демонстрация наших возможностей в AI-генерации.'
+      : 'Music created by neural networks. Demo of our AI generation capabilities.',
+    channelLink: lang === 'ru' ? 'Подписаться на канал' : 'Subscribe to channel',
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>{t.title}</title>
+        <meta name="description" content={t.description} />
+        <meta property="og:title" content={t.title} />
+        <meta property="og:description" content={t.description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://tecai.ru/neuro-generation/audio" />
+        <meta name="keywords" content={lang === 'ru'
+          ? 'нейро музыка, AI музыка, генерация музыки, нейросети, SUNO, Udio, электронная музыка'
+          : 'neuro music, AI music, music generation, neural networks, SUNO, Udio, electronic music'} />
+      </Helmet>
+
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-zinc-900 to-black text-white py-8 px-4">
+        {/* Header section */}
+        <div className="max-w-7xl mx-auto mb-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+              {t.heading}
+            </h1>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              {t.subtitle}
+            </p>
+          </div>
+
+          {/* Spotify-style player */}
+          <SpotifyPlayer lang={lang} />
+
+          {/* Channel link */}
+          <div className="text-center mt-8">
+            <a
+              href="https://t.me/neyrozvuki"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-[#0088cc] hover:bg-[#0077b5] text-white px-6 py-3 rounded-full font-medium transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.442-.751-.244-1.349-.374-1.297-.789.027-.216.324-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.015 3.333-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.121.1.154.234.17.331.015.098.034.322.019.496z"/>
+              </svg>
+              {t.channelLink}
+            </a>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 export default AudioPage;
