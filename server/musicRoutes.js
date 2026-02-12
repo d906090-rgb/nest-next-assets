@@ -50,7 +50,8 @@ const defaultMetadata = () => ({
   syncStatus: 'never',
   channelUsername: DEFAULT_CHANNEL_USERNAME,
   totalTracks: 0,
-  lastUpdateId: 0,
+  lastScannedMsgId: 0,
+  syncProgress: null,
   coverJobs: {},
 });
 
@@ -134,6 +135,65 @@ const shouldIncludePost = (post, channelUsername) => {
   if (post.chat.type !== 'channel') return false;
   const username = (post.chat.username || '').toLowerCase();
   return username === (channelUsername || '').toLowerCase();
+};
+
+const upsertTrackFromAudio = ({ audio, messageId, timestamp, albumsById, seenUniqueIds }) => {
+  const uniqueId = audio?.file_unique_id;
+  if (!uniqueId || seenUniqueIds.has(uniqueId)) {
+    return false;
+  }
+
+  const parsed = parseTrackAndAlbum(audio);
+  const albumId = createAlbumId(parsed.albumTitle);
+  if (!albumsById.has(albumId)) {
+    albumsById.set(albumId, {
+      id: albumId,
+      title: parsed.albumTitle,
+      artist: parsed.artist,
+      coverUrl: null,
+      coverGenerated: false,
+      trackCount: 0,
+      tracks: [],
+      createdAt: new Date((timestamp || Date.now() / 1000) * 1000).toISOString(),
+    });
+  }
+
+  const album = albumsById.get(albumId);
+  album.tracks.unshift({
+    id: `track_${uniqueId}`,
+    title: parsed.trackTitle,
+    artist: parsed.artist,
+    albumId,
+    duration: audio.duration || 180,
+    audioUrl: `/api/music/file/${audio.file_id}`,
+    telegramFileId: audio.file_id,
+    fileUniqueId: uniqueId,
+    telegramPostId: messageId,
+    createdAt: new Date((timestamp || Date.now() / 1000) * 1000).toISOString(),
+  });
+  album.trackCount = album.tracks.length;
+  seenUniqueIds.add(uniqueId);
+  return true;
+};
+
+const forwardMessageForInspection = async ({ token, chatId, messageId }) => {
+  const response = await fetch(
+    `https://api.telegram.org/bot${token}/forwardMessage?chat_id=${encodeURIComponent(chatId)}&from_chat_id=${encodeURIComponent(chatId)}&message_id=${messageId}&disable_notification=true`,
+  );
+  const data = await response.json();
+  if (!data?.ok || !data.result) {
+    return null;
+  }
+
+  // We forward to the same channel to gain full payload of the original message.
+  // The forwarded copy must be deleted immediately to keep the channel clean.
+  const forwardedMessage = data.result;
+  if (forwardedMessage.message_id) {
+    await fetch(
+      `https://api.telegram.org/bot${token}/deleteMessage?chat_id=${encodeURIComponent(chatId)}&message_id=${forwardedMessage.message_id}`,
+    ).catch(() => {});
+  }
+  return forwardedMessage;
 };
 
 const startCoverJob = async (album, metadata, kieApiKey) => {
@@ -312,7 +372,8 @@ export const setupMusicRoutes = (app) => {
         lastSync: metadata.lastSync,
         totalTracks: metadata.totalTracks,
         totalAlbums: metadata.albums.length,
-        lastUpdateId: metadata.lastUpdateId,
+        lastScannedMsgId: Number(metadata.lastScannedMsgId || 0),
+        syncProgress: metadata.syncProgress || null,
       });
     } catch {
       res.status(500).json({ error: 'Failed to read sync status' });
@@ -329,6 +390,7 @@ export const setupMusicRoutes = (app) => {
 
     const metadata = await readMetadata();
     metadata.syncStatus = 'syncing';
+    metadata.syncProgress = 'initializing';
     await writeMetadata(metadata);
 
     try {
@@ -340,135 +402,67 @@ export const setupMusicRoutes = (app) => {
       );
 
       const albumsById = new Map(metadata.albums.map((album) => [album.id, album]));
-      let offset = Number(metadata.lastUpdateId || 0) + 1;
-      let keepFetching = true;
-      let loopGuard = 0;
+      const channelChatResponse = await fetch(
+        `https://api.telegram.org/bot${token}/getChat?chat_id=@${encodeURIComponent(channelUsername)}`,
+      );
+      const channelChatData = await channelChatResponse.json();
+      if (!channelChatData?.ok || !channelChatData?.result?.id) {
+        throw new Error(channelChatData?.description || 'Failed to read channel chat info');
+      }
 
-      while (keepFetching && loopGuard < 20) {
-        loopGuard += 1;
-        const updatesUrl =
-          `https://api.telegram.org/bot${token}/getUpdates?allowed_updates=["channel_post"]&limit=100&offset=${offset}`;
-        const updatesResponse = await fetch(updatesUrl);
-        const updatesData = await updatesResponse.json();
-        const updates = updatesData?.result || [];
+      const channelChatId = channelChatData.result.id;
+      const pinned = channelChatData?.result?.pinned_message;
+      const pinnedMessageId = Number(pinned?.message_id || 0);
+      const lastScanned = Number(metadata.lastScannedMsgId || 0);
+      const firstScan = lastScanned <= 0;
+      const startMsgId = Math.max(firstScan ? 1 : lastScanned + 1, 1);
+      const firstScanEnd = pinnedMessageId > 0 ? pinnedMessageId + 50 : startMsgId + 250;
+      const incrementalEnd = Math.max(startMsgId + 100, pinnedMessageId + 50);
+      const endMsgId = Math.max(startMsgId, firstScan ? firstScanEnd : incrementalEnd);
+      const totalToScan = Math.max(0, endMsgId - startMsgId + 1);
 
-        if (!updatesData?.ok) {
-          throw new Error(updatesData?.description || 'Failed to fetch Telegram updates');
+      for (let messageId = startMsgId; messageId <= endMsgId; messageId += 1) {
+        metadata.syncProgress = `scanning ${messageId - startMsgId + 1}/${totalToScan}`;
+        metadata.lastScannedMsgId = messageId;
+        if (messageId === startMsgId || messageId % 15 === 0 || messageId === endMsgId) {
+          await writeMetadata(metadata);
         }
 
-        if (!updates.length) {
-          break;
+        const forwardedMessage = await forwardMessageForInspection({
+          token,
+          chatId: channelChatId,
+          messageId,
+        });
+        if (!forwardedMessage || !shouldIncludePost(forwardedMessage, channelUsername)) {
+          await sleep(50);
+          continue;
         }
 
-        for (const update of updates) {
-          const post = update.channel_post;
-          if (update.update_id && update.update_id >= offset) {
-            offset = update.update_id + 1;
-            metadata.lastUpdateId = update.update_id;
-          }
-
-          if (!shouldIncludePost(post, channelUsername)) {
-            continue;
-          }
-
-          const audioPayload = post.audio
-            ? { audio: post.audio, messageId: post.message_id, timestamp: post.date }
-            : post.pinned_message?.audio
-              ? {
-                  audio: post.pinned_message.audio,
-                  messageId: post.pinned_message.message_id || post.message_id,
-                  timestamp: post.pinned_message.date || post.date,
-                }
-              : null;
-
-          if (!audioPayload) {
-            continue;
-          }
-
-          const { audio, messageId, timestamp } = audioPayload;
-          const uniqueId = audio.file_unique_id;
-          if (!uniqueId || seenUniqueIds.has(uniqueId)) {
-            continue;
-          }
-
-          const parsed = parseTrackAndAlbum(audio);
-          const albumId = createAlbumId(parsed.albumTitle);
-          if (!albumsById.has(albumId)) {
-            albumsById.set(albumId, {
-              id: albumId,
-              title: parsed.albumTitle,
-              artist: parsed.artist,
-              coverUrl: null,
-              coverGenerated: false,
-              trackCount: 0,
-              tracks: [],
-              createdAt: new Date(post.date * 1000).toISOString(),
-            });
-          }
-
-          const album = albumsById.get(albumId);
-          const track = {
-            id: `track_${uniqueId}`,
-            title: parsed.trackTitle,
-            artist: parsed.artist,
-            albumId,
-            duration: audio.duration || 180,
-            audioUrl: `/api/music/file/${audio.file_id}`,
-            telegramFileId: audio.file_id,
-            fileUniqueId: uniqueId,
-            telegramPostId: messageId,
-            createdAt: new Date(timestamp * 1000).toISOString(),
-          };
-
-          album.tracks.unshift(track);
-          album.trackCount = album.tracks.length;
-          seenUniqueIds.add(uniqueId);
+        if (forwardedMessage.audio) {
+          upsertTrackFromAudio({
+            audio: forwardedMessage.audio,
+            messageId,
+            timestamp: forwardedMessage.forward_date || forwardedMessage.date,
+            albumsById,
+            seenUniqueIds,
+          });
         }
-
-        keepFetching = updates.length === 100;
+        await sleep(50);
       }
 
       // Fallback: also ingest pinned message audio from channel chat state,
       // because it may exist without a fresh channel_post update event.
       try {
-        const channelChatResponse = await fetch(
-          `https://api.telegram.org/bot${token}/getChat?chat_id=@${encodeURIComponent(channelUsername)}`,
-        );
-        const channelChatData = await channelChatResponse.json();
-        const pinned = channelChatData?.result?.pinned_message;
         const pinnedAudio = pinned?.audio;
 
-        if (pinnedAudio?.file_unique_id && !seenUniqueIds.has(pinnedAudio.file_unique_id)) {
-          const parsed = parseTrackAndAlbum(pinnedAudio);
-          const albumId = createAlbumId(parsed.albumTitle);
-          if (!albumsById.has(albumId)) {
-            albumsById.set(albumId, {
-              id: albumId,
-              title: parsed.albumTitle,
-              artist: parsed.artist,
-              coverUrl: null,
-              coverGenerated: false,
-              trackCount: 0,
-              tracks: [],
-              createdAt: new Date((pinned?.date || Date.now() / 1000) * 1000).toISOString(),
-            });
-          }
-
-          const album = albumsById.get(albumId);
-          album.tracks.unshift({
-            id: `track_${pinnedAudio.file_unique_id}`,
-            title: parsed.trackTitle,
-            artist: parsed.artist,
-            albumId,
-            duration: pinnedAudio.duration || 180,
-            audioUrl: `/api/music/file/${pinnedAudio.file_id}`,
-            telegramFileId: pinnedAudio.file_id,
-            fileUniqueId: pinnedAudio.file_unique_id,
-            telegramPostId: pinned?.message_id || 0,
-            createdAt: new Date((pinned?.date || Date.now() / 1000) * 1000).toISOString(),
+        if (pinnedAudio?.file_unique_id) {
+          upsertTrackFromAudio({
+            audio: pinnedAudio,
+            messageId: pinned?.message_id || 0,
+            timestamp: pinned?.date || Date.now() / 1000,
+            albumsById,
+            seenUniqueIds,
           });
-          album.trackCount = album.tracks.length;
-          seenUniqueIds.add(pinnedAudio.file_unique_id);
         }
       } catch (pinnedError) {
         // Non-fatal fallback path
@@ -497,12 +491,14 @@ export const setupMusicRoutes = (app) => {
 
       metadata.lastSync = new Date().toISOString();
       metadata.syncStatus = 'success';
+      metadata.syncProgress = null;
       await writeMetadata(metadata);
 
       res.json(metadata);
     } catch (error) {
       metadata.syncStatus = 'error';
       metadata.lastSync = new Date().toISOString();
+      metadata.syncProgress = null;
       await writeMetadata(metadata);
       res.status(500).json({ error: 'Sync failed', message: error?.message || 'Unknown error' });
     }
