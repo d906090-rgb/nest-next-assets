@@ -210,7 +210,7 @@ const startCoverJob = async (album, metadata, kieApiKey) => {
     return false;
   }
 
-  const coverPrompt = `Abstract album cover for "${album.title}" electronic neuro music, premium design, vibrant and cinematic`;
+  const coverPrompt = `Abstract album cover art for "${album.title}" — AI-generated electronic neuro music album. Futuristic cinematic design with vibrant neon colors, deep space or cyberpunk atmosphere, glowing neural network patterns, premium quality, no text, square format`;
   const response = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
     method: 'POST',
     headers: {
@@ -218,10 +218,12 @@ const startCoverJob = async (album, metadata, kieApiKey) => {
       Authorization: `Bearer ${kieApiKey}`,
     },
     body: JSON.stringify({
-      model: 'z-image',
+      model: 'nano-banana-pro',
       input: {
         prompt: coverPrompt,
         aspect_ratio: '1:1',
+        resolution: '1K',
+        output_format: 'jpg',
       },
     }),
   });
@@ -240,6 +242,7 @@ const startCoverJob = async (album, metadata, kieApiKey) => {
     metadata.coverJobs[album.id] = {
       taskId: result.data.taskId,
       status: 'processing',
+      model: 'nano_banana_pro',
       updatedAt: new Date().toISOString(),
     };
     return true;
@@ -248,9 +251,38 @@ const startCoverJob = async (album, metadata, kieApiKey) => {
   metadata.coverJobs[album.id] = {
     status: 'error',
     updatedAt: new Date().toISOString(),
-    reason: result?.msg || 'kie_create_task_failed',
+    reason: result?.msg || 'nano_banana_pro_create_task_failed',
   };
   return false;
+};
+
+const compressJpeg = async (inputPath, outputPath, maxBytes = 51200) => {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+  try {
+    // ImageMagick convert with jpeg:extent for precise size limit
+    await execFileAsync('convert', [
+      inputPath,
+      '-strip',
+      '-define', `jpeg:extent=${Math.floor(maxBytes / 1024)}kb`,
+      outputPath,
+    ]);
+    return true;
+  } catch {
+    // Fallback: try jpegoptim in-place
+    try {
+      await fs.copyFile(inputPath, outputPath);
+      await execFileAsync('jpegoptim', [
+        `--size=${Math.floor(maxBytes / 1024)}k`,
+        '--strip-all',
+        outputPath,
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 };
 
 const resolveCoverJobs = async (metadata, kieApiKey) => {
@@ -293,7 +325,9 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
           continue;
         }
 
-        const imageResponse = await fetch(outputUrl);
+        const imageResponse = await fetch(outputUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 TecAI-CoverBot/1.0' },
+        });
         if (!imageResponse.ok) {
           metadata.coverJobs[albumId] = {
             ...job,
@@ -305,13 +339,23 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
         }
 
         const imageBuffer = await imageResponse.arrayBuffer();
-        const filename = `${albumId}-${job.taskId}.webp`;
-        const filepath = path.join(COVERS_DIR, filename);
-        await fs.writeFile(filepath, Buffer.from(imageBuffer));
+        const tmpRawPath = path.join(COVERS_DIR, `${albumId}-${job.taskId}.tmp.jpg`);
+        const finalFilename = `${albumId}-cover.jpg`;
+        const finalPath = path.join(COVERS_DIR, finalFilename);
+
+        await fs.writeFile(tmpRawPath, Buffer.from(imageBuffer));
+
+        const compressed = await compressJpeg(tmpRawPath, finalPath, 51200);
+        if (!compressed) {
+          // If compression tools unavailable, keep original
+          await fs.rename(tmpRawPath, finalPath).catch(() => {});
+        } else {
+          await fs.unlink(tmpRawPath).catch(() => {});
+        }
 
         const album = metadata.albums.find((item) => item.id === albumId);
         if (album) {
-          album.coverUrl = `/api/music/cover-file/${filename}`;
+          album.coverUrl = `/api/music/cover-file/${finalFilename}`;
           album.coverGenerated = true;
         }
 
@@ -319,7 +363,8 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
           ...job,
           status: 'success',
           updatedAt: new Date().toISOString(),
-          filename,
+          filename: finalFilename,
+          model: 'nano_banana_pro',
         };
       } else {
         metadata.coverJobs[albumId] = {
@@ -561,9 +606,12 @@ export const setupMusicRoutes = (app) => {
       const filename = path.basename(req.params.filename);
       const filepath = path.join(COVERS_DIR, filename);
       const file = await fs.readFile(filepath);
+      const ext = path.extname(filename).toLowerCase();
+      const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.png': 'image/png' };
+      const contentType = mimeMap[ext] || 'image/jpeg';
       res.removeHeader('Content-Security-Policy');
       res.removeHeader('Cross-Origin-Resource-Policy');
-      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
       res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
       res.send(file);
@@ -578,7 +626,7 @@ export const setupMusicRoutes = (app) => {
       const { prompt } = req.body || {};
       const kieApiKey = process.env.KIE_AI_API_KEY;
       if (!kieApiKey) {
-        return res.status(500).json({ error: 'KIE AI key not configured' });
+        return res.status(500).json({ error: 'KIE AI key not configured (nano-banana-pro)' });
       }
 
       const metadata = await readMetadata();
@@ -587,18 +635,23 @@ export const setupMusicRoutes = (app) => {
         return res.status(404).json({ error: 'Album not found' });
       }
 
+      // Allow regeneration: clear existing cover so startCoverJob proceeds
+      album.coverUrl = null;
+      album.coverGenerated = false;
+      delete metadata.coverJobs[albumId];
+
       await startCoverJob(
         {
           ...album,
-          title: prompt ? `${album.title} ${prompt}` : album.title,
+          title: prompt ? `${album.title} — ${prompt}` : album.title,
         },
         metadata,
         kieApiKey,
       );
       await writeMetadata(metadata);
-      res.json({ status: 'processing', job: metadata.coverJobs[album.id] || null });
+      res.json({ status: 'processing', model: 'nano_banana_pro', job: metadata.coverJobs[album.id] || null });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to start cover generation' });
+      res.status(500).json({ error: 'Failed to start cover generation (nano-banana-pro)' });
     }
   });
 
