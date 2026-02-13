@@ -13,6 +13,7 @@ import {
   Disc,
   Clock,
   RefreshCw,
+  Send,
 } from 'lucide-react';
 
 interface Track {
@@ -307,6 +308,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
     poweredBy: lang === 'ru' ? 'Музыка от нейросетей' : 'Music by AI',
     neuroMusic: lang === 'ru' ? 'Нейро Музыка' : 'Neuro Music',
     demo: lang === 'ru' ? 'Демонстрация возможностей' : 'Demo of capabilities',
+    subscribe: lang === 'ru' ? 'Подписаться' : 'Subscribe',
   };
 
   if (isLoading) {
@@ -394,7 +396,18 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ lang }) => {
         <div className="flex-1 bg-linear-to-b from-[#16233D]/60 to-[#0C1424] flex flex-col">
           {/* Album header */}
           {selectedAlbum && (
-            <div className="p-6 bg-linear-to-b from-zinc-700/30 to-transparent">
+            <div className="p-6 bg-linear-to-b from-zinc-700/30 to-transparent relative">
+              {metadata?.channelUsername && (
+                <a
+                  href={`https://t.me/${metadata.channelUsername.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute top-6 right-6 bg-[#00F0FF] hover:bg-[#31F5FF] text-black px-6 py-2 rounded-full text-sm font-semibold transition-colors shadow-lg shadow-[#00F0FF]/20 flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  {t.subscribe}
+                </a>
+              )}
               <div className="flex items-end gap-6">
                 <div className="w-48 h-48 rounded-lg shadow-2xl overflow-hidden bg-zinc-800 shrink-0">
                   {selectedAlbum.coverUrl ? (
