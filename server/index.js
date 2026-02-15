@@ -10,12 +10,22 @@ dotenv.config();
 
 const app = express();
 const allowedOrigins = new Set(['https://tecai.ru', 'https://www.tecai.ru']);
+const allowedRefererPrefixes = Array.from(allowedOrigins).map((origin) => `${origin}/`);
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+    },
+  }),
+);
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.has(origin)) {
+      if (origin && allowedOrigins.has(origin)) {
         callback(null, true);
         return;
       }
@@ -61,13 +71,38 @@ const imageCreateLimiter = rateLimit({
 app.use('/api', baseApiLimiter);
 
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+const ASPECT_RATIO_RE = /^[0-9]{1,2}:[0-9]{1,2}$/;
+const TASK_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
+
+const escapeHtml = (value) =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const requireTrustedOrigin = (req, res, next) => {
+  const origin = req.get('origin');
+  const referer = req.get('referer');
+
+  if (origin && allowedOrigins.has(origin)) {
+    return next();
+  }
+
+  if (!origin && typeof referer === 'string' && allowedRefererPrefixes.some((prefix) => referer.startsWith(prefix))) {
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Forbidden' });
+};
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // OpenAI Chat endpoint
-app.post('/api/chat', chatLimiter, async (req, res) => {
+app.post('/api/chat', requireTrustedOrigin, chatLimiter, async (req, res) => {
   try {
     const { message } = req.body;
     if (!isNonEmptyString(message) || message.length > 2000) {
@@ -103,20 +138,19 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
     res.json({ content: response.choices[0].message.content });
   } catch (error) {
     console.error('OpenAI Error:', error);
-    const statusCode = typeof error?.status === 'number' ? error.status : 500;
-    res.status(statusCode).json({ error: 'AI service temporarily unavailable' });
+    res.status(503).json({ error: 'AI service temporarily unavailable' });
   }
 });
 
 // Kie.ai Image Generation endpoints
-app.post('/api/image/create', imageCreateLimiter, async (req, res) => {
+app.post('/api/image/create', requireTrustedOrigin, imageCreateLimiter, async (req, res) => {
   try {
     const { prompt, aspectRatio } = req.body;
     if (!isNonEmptyString(prompt) || prompt.length > 2000) {
       return res.status(400).json({ error: 'Invalid "prompt". Must be a non-empty string up to 2000 chars.' });
     }
-    if (aspectRatio && typeof aspectRatio !== 'string') {
-      return res.status(400).json({ error: 'Invalid "aspectRatio". Must be a string when provided.' });
+    if (aspectRatio && (typeof aspectRatio !== 'string' || !ASPECT_RATIO_RE.test(aspectRatio))) {
+      return res.status(400).json({ error: 'Invalid "aspectRatio". Expected format "W:H".' });
     }
     const apiKey = process.env.KIE_AI_API_KEY;
 
@@ -146,7 +180,7 @@ app.post('/api/image/create', imageCreateLimiter, async (req, res) => {
 app.get('/api/image/status/:taskId', async (req, res) => {
   try {
     const { taskId } = req.params;
-    if (!isNonEmptyString(taskId) || taskId.length > 128) {
+    if (!isNonEmptyString(taskId) || !TASK_ID_RE.test(taskId)) {
       return res.status(400).json({ error: 'Invalid "taskId".' });
     }
     const apiKey = process.env.KIE_AI_API_KEY;
@@ -166,17 +200,38 @@ app.get('/api/image/status/:taskId', async (req, res) => {
 });
 
 // Telegram endpoint
-app.post('/api/telegram', telegramLimiter, async (req, res) => {
+app.post('/api/telegram', requireTrustedOrigin, telegramLimiter, async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!isNonEmptyString(text) || text.length > 2000) {
-      return res.status(400).json({ error: 'Invalid "text". Must be a non-empty string up to 2000 chars.' });
-    }
+    const { text, locale, name, contact, tariffName, configDetails, notes } = req.body || {};
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!token || !chatId) {
       return res.status(500).json({ error: 'Telegram configuration missing' });
+    }
+
+    let messageText = '';
+    if (isNonEmptyString(text)) {
+      if (text.length > 2000) {
+        return res.status(400).json({ error: 'Invalid "text". Must be up to 2000 chars.' });
+      }
+      messageText = escapeHtml(text);
+    } else {
+      if (!isNonEmptyString(name) || !isNonEmptyString(contact) || !isNonEmptyString(tariffName)) {
+        return res.status(400).json({ error: 'Invalid order payload.' });
+      }
+
+      const normalizedLocale = locale === 'en' ? 'en' : 'ru';
+      const safeName = escapeHtml(name.trim().slice(0, 200));
+      const safeContact = escapeHtml(contact.trim().slice(0, 200));
+      const safeTariff = escapeHtml(tariffName.trim().slice(0, 200));
+      const safeConfig = isNonEmptyString(configDetails) ? escapeHtml(configDetails.trim().slice(0, 1000)) : '';
+      const safeNotes = isNonEmptyString(notes) ? escapeHtml(notes.trim().slice(0, 3000)) : '';
+
+      messageText =
+        normalizedLocale === 'ru'
+          ? `🚀 <b>НОВАЯ ЗАЯВКА</b>\n\n👤 <b>Имя:</b> ${safeName}\n📱 <b>Контакт:</b> ${safeContact}\n💎 <b>Тариф:</b> ${safeTariff}${safeConfig ? `\n⚙️ <b>Конфигурация:</b> ${safeConfig}` : ''}${safeNotes ? `\n📝 <b>Комментарий:</b> ${safeNotes}` : ''}`
+          : `🚀 <b>NEW ORDER</b>\n\n👤 <b>Name:</b> ${safeName}\n📱 <b>Contact:</b> ${safeContact}\n💎 <b>Tier:</b> ${safeTariff}${safeConfig ? `\n⚙️ <b>Configuration:</b> ${safeConfig}` : ''}${safeNotes ? `\n📝 <b>Notes:</b> ${safeNotes}` : ''}`;
     }
 
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
@@ -187,7 +242,7 @@ app.post('/api/telegram', telegramLimiter, async (req, res) => {
       },
       body: JSON.stringify({
         chat_id: chatId,
-        text: text,
+        text: messageText,
         parse_mode: 'HTML',
       }),
     });

@@ -2,11 +2,11 @@
 
 ## Текущая настройка
 
-- **Bot Token:** `7956651051:AAFbK2X4eXNN1nLrDO-y7T6Yix_ciLxIZRA` (@neyrozavodbot)
-- **Chat ID (User):** `392126069` (@ReanimatorXP)
-- **Chat ID (Group):** `-1003131792967` (@maketestReanim - "Заказы")
+- **Bot Token:** `YOUR_TELEGRAM_BOT_TOKEN` (@your_bot_username)
+- **Chat ID (User):** `YOUR_USER_CHAT_ID`
+- **Chat ID (Group):** `YOUR_GROUP_CHAT_ID` (@your_group - "Orders")
 
-**Сейчас активна:** Группа @maketestReanim
+**Сейчас активна:** Группа (укажите вашу)
 
 ## Как развернуть изменения
 
@@ -28,18 +28,18 @@ cp dist/assets/index-*.css assets/index-4qhlatjO.css
 
 ```bash
 # Тест отправки сообщения пользователю
-curl -s "https://api.telegram.org/bot7956651051:AAFbK2X4eXNN1nLrDO-y7T6Yix_ciLxIZRA/sendMessage?chat_id=392126069&text=Test&parse_mode=HTML"
+curl -s "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage?chat_id=YOUR_USER_CHAT_ID&text=Test&parse_mode=HTML"
 
 # Тест отправки в группу
-curl -s "https://api.telegram.org/bot7956651051:AAFbK2X4eXNN1nLrDO-y7T6Yix_ciLxIZRA/sendMessage?chat_id=-1003131792967&text=Test&parse_mode=HTML"
+curl -s "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage?chat_id=YOUR_GROUP_CHAT_ID&text=Test&parse_mode=HTML"
 ```
 
 ## Переменные окружения
 
 В `.env` файле:
 ```
-TELEGRAM_BOT_TOKEN=7956651051:AAFbK2X4eXNN1nLrDO-y7T6Yix_ciLxIZRA
-TELEGRAM_CHAT_ID=392126069
+TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID=YOUR_DEFAULT_CHAT_ID
 ```
 
 ## Как сменить получателя
@@ -48,12 +48,12 @@ TELEGRAM_CHAT_ID=392126069
 
 **В `App.tsx` (строка 1086):**
 ```typescript
-const chatId = process.env.TELEGRAM_CHAT_ID || '-1003131792967';
+const chatId = process.env.TELEGRAM_CHAT_ID || 'YOUR_GROUP_CHAT_ID';
 ```
 
 **Или обновить `.env`:**
 ```
-TELEGRAM_CHAT_ID=-1003131792967
+TELEGRAM_CHAT_ID=YOUR_GROUP_CHAT_ID
 ```
 
 ## Диагностика проблем

@@ -571,18 +571,22 @@ const Home: React.FC<HomeProps> = ({ lang }) => {
                 <Stepper
                   initialStep={1}
                   onFinalStepCompleted={async () => {
-                     const tariffName = selectedTierIndex !== null ? t.tickets.tiers[selectedTierIndex].name : (lang === 'ru' ? 'Нужна консультация' : 'Need consultation');
-                     const configDetails = formData.config ? `\n⚙️ <b>Конфигурация:</b> ${formData.config}` : '';
-                     const userNotes = formData.notes ? `\n📝 <b>Комментарий:</b> ${formData.notes}` : '';
-                     const messageText = lang === 'ru' 
-                       ? `🚀 <b>НОВАЯ ЗАЯВКА</b>\n\n👤 <b>Имя:</b> ${formData.name}\n📱 <b>Контакт:</b> ${formData.contact}\n💎 <b>Тариф:</b> ${tariffName}${configDetails}${userNotes}`
-                       : `🚀 <b>NEW ORDER</b>\n\n👤 <b>Name:</b> ${formData.name}\n📱 <b>Contact:</b> ${formData.contact}\n💎 <b>Tier:</b> ${tariffName}${configDetails}${userNotes}`;
+                     const tariffName = selectedTierIndex !== null
+                       ? t.tickets.tiers[selectedTierIndex].name
+                       : (lang === 'ru' ? 'Нужна консультация' : 'Need consultation');
 
                      try {
                         const response = await fetch('/api/telegram', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ text: messageText }),
+                          body: JSON.stringify({
+                            locale: lang,
+                            name: formData.name,
+                            contact: formData.contact,
+                            tariffName,
+                            configDetails: formData.config || '',
+                            notes: formData.notes || '',
+                          }),
                         });
                         if (!response.ok) console.error('Telegram API Error');
                      } catch (error) {

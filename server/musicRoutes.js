@@ -1,11 +1,18 @@
 import { rateLimit } from 'express-rate-limit';
 import fs from 'fs/promises';
 import path from 'path';
+import { isIP } from 'net';
 
 const MUSIC_RUNTIME_DIR = process.env.MUSIC_RUNTIME_DIR || '/var/lib/tecai/music';
 const MUSIC_METADATA_PATH = path.join(MUSIC_RUNTIME_DIR, 'music-metadata.json');
 const COVERS_DIR = path.join(MUSIC_RUNTIME_DIR, 'covers');
 const DEFAULT_CHANNEL_USERNAME = 'neyrozvuki';
+const TRUSTED_ORIGINS = new Set(['https://tecai.ru', 'https://www.tecai.ru']);
+const TRUSTED_REFERER_PREFIXES = Array.from(TRUSTED_ORIGINS).map((origin) => `${origin}/`);
+const FILE_ID_RE = /^[a-zA-Z0-9_-]{10,256}$/;
+const TASK_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
+const ALBUM_ID_RE = /^album_[a-zA-Z0-9_-]{1,24}$/;
+const SAFE_FILENAME_RE = /^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/i;
 
 const AUDIO_MIME_MAP = {
   '.mp3': 'audio/mpeg',
@@ -37,6 +44,14 @@ const coverLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'Cover generation rate limit exceeded.' },
+});
+
+const musicReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 200,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Music API rate limit exceeded.' },
 });
 
 const ensureDirs = async () => {
@@ -78,6 +93,42 @@ const writeMetadata = async (metadata) => {
 
 const createAlbumId = (albumTitle) => `album_${Buffer.from(albumTitle).toString('base64url').slice(0, 18)}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isPrivateIp = (host) => {
+  if (!isIP(host)) return false;
+  if (host === '127.0.0.1' || host === '::1') return true;
+  if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('169.254.')) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
+  if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return true;
+  return false;
+};
+
+const isAllowedRemoteUrl = (urlString) => {
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.protocol !== 'https:') return false;
+    const host = (parsed.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host.endsWith('.local')) return false;
+    if (isPrivateIp(host)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const requireTrustedOrigin = (req, res, next) => {
+  const origin = req.get('origin');
+  const referer = req.get('referer');
+
+  if (origin && TRUSTED_ORIGINS.has(origin)) {
+    return next();
+  }
+  if (!origin && typeof referer === 'string' && TRUSTED_REFERER_PREFIXES.some((prefix) => referer.startsWith(prefix))) {
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Forbidden' });
+};
 
 const extractCoverOutputUrl = (taskData) => {
   const directUrl =
@@ -325,6 +376,16 @@ const resolveCoverJobs = async (metadata, kieApiKey) => {
           continue;
         }
 
+        if (!isAllowedRemoteUrl(outputUrl)) {
+          metadata.coverJobs[albumId] = {
+            ...job,
+            status: 'error',
+            updatedAt: new Date().toISOString(),
+            reason: 'disallowed_output_url',
+          };
+          continue;
+        }
+
         const imageResponse = await fetch(outputUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0 TecAI-CoverBot/1.0' },
         });
@@ -400,7 +461,7 @@ const resolveCoverJobsWithRetries = async (metadata, kieApiKey, retries = 4, del
 };
 
 export const setupMusicRoutes = (app) => {
-  app.get('/api/music/albums', async (req, res) => {
+  app.get('/api/music/albums', musicReadLimiter, async (req, res) => {
     try {
       const metadata = await readMetadata();
       res.json(metadata);
@@ -409,7 +470,7 @@ export const setupMusicRoutes = (app) => {
     }
   });
 
-  app.get('/api/music/sync-status', async (req, res) => {
+  app.get('/api/music/sync-status', musicReadLimiter, async (req, res) => {
     try {
       const metadata = await readMetadata();
       res.json({
@@ -425,7 +486,7 @@ export const setupMusicRoutes = (app) => {
     }
   });
 
-  app.post('/api/music/sync', musicSyncLimiter, async (req, res) => {
+  app.post('/api/music/sync', requireTrustedOrigin, musicSyncLimiter, async (req, res) => {
     const token = process.env.TELEGRAM_MUSIC_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     const kieApiKey = process.env.KIE_AI_API_KEY;
 
@@ -545,13 +606,16 @@ export const setupMusicRoutes = (app) => {
       metadata.lastSync = new Date().toISOString();
       metadata.syncProgress = null;
       await writeMetadata(metadata);
-      res.status(500).json({ error: 'Sync failed', message: error?.message || 'Unknown error' });
+      res.status(500).json({ error: 'Sync failed' });
     }
   });
 
-  app.get('/api/music/file/:fileId', async (req, res) => {
+  app.get('/api/music/file/:fileId', musicReadLimiter, async (req, res) => {
     try {
       const { fileId } = req.params;
+      if (!FILE_ID_RE.test(fileId)) {
+        return res.status(400).json({ error: 'Invalid "fileId".' });
+      }
       const token = process.env.TELEGRAM_MUSIC_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
       if (!token) {
         return res.status(500).json({ error: 'Telegram bot token not configured' });
@@ -601,9 +665,12 @@ export const setupMusicRoutes = (app) => {
     }
   });
 
-  app.get('/api/music/cover-file/:filename', async (req, res) => {
+  app.get('/api/music/cover-file/:filename', musicReadLimiter, async (req, res) => {
     try {
       const filename = path.basename(req.params.filename);
+      if (!SAFE_FILENAME_RE.test(filename)) {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
       const filepath = path.join(COVERS_DIR, filename);
       const file = await fs.readFile(filepath);
       const ext = path.extname(filename).toLowerCase();
@@ -620,9 +687,12 @@ export const setupMusicRoutes = (app) => {
     }
   });
 
-  app.post('/api/music/cover/:albumId', coverLimiter, async (req, res) => {
+  app.post('/api/music/cover/:albumId', requireTrustedOrigin, coverLimiter, async (req, res) => {
     try {
       const { albumId } = req.params;
+      if (!ALBUM_ID_RE.test(albumId)) {
+        return res.status(400).json({ error: 'Invalid "albumId".' });
+      }
       const { prompt } = req.body || {};
       const kieApiKey = process.env.KIE_AI_API_KEY;
       if (!kieApiKey) {
@@ -655,9 +725,12 @@ export const setupMusicRoutes = (app) => {
     }
   });
 
-  app.get('/api/music/cover-status/:taskId', async (req, res) => {
+  app.get('/api/music/cover-status/:taskId', musicReadLimiter, async (req, res) => {
     try {
       const { taskId } = req.params;
+      if (!TASK_ID_RE.test(taskId)) {
+        return res.status(400).json({ error: 'Invalid "taskId".' });
+      }
       const metadata = await readMetadata();
       const jobEntry = Object.entries(metadata.coverJobs || {}).find(
         ([, job]) => job?.taskId === taskId,
